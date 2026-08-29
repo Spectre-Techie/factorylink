@@ -12,6 +12,8 @@ function getStringEnv(name: string): string {
   return value;
 }
 
+const validAfricaTalkingEnvironments = ['sandbox', 'production'] as const;
+
 export const config = {
   appName: 'FactoryLink',
   environment: getStringEnv('NODE_ENV'),
@@ -24,7 +26,7 @@ export const config = {
     dbUrl: process.env.SUPABASE_DB_URL ?? '',
   },
   africaTalking: {
-    environment: getStringEnv('AT_ENVIRONMENT'),
+    environment: getStringEnv('AT_ENVIRONMENT') as (typeof validAfricaTalkingEnvironments)[number],
     username: getStringEnv('AT_USERNAME'),
     apiKey: getStringEnv('AT_API_KEY'),
     baseUrl: process.env.AT_BASE_URL ?? 'https://api.africastalking.com',
@@ -42,5 +44,11 @@ export function assertServerConfig(): void {
 
   for (const key of required) {
     getStringEnv(key);
+  }
+
+  const atEnvironment = config.africaTalking.environment;
+
+  if (!validAfricaTalkingEnvironments.includes(atEnvironment)) {
+    throw new Error(`Invalid AT_ENVIRONMENT: ${atEnvironment}. Supported values: sandbox, production`);
   }
 }
