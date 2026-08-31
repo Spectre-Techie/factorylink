@@ -1,15 +1,107 @@
 import express, { NextFunction, Request, Response } from 'express';
 
 import { assertServerConfig, config } from './config.js';
+import { AuthService, type AppUser } from './services/authService.js';
+import { createAuthRepository } from './services/authRepository.js';
 import { createAfricaTalkingProvider } from './services/africastalking/provider.js';
+import { createInventoryRepository } from './services/inventoryRepository.js';
+import { InventoryService } from './services/inventoryService.js';
+import { createWorkOrderRepository } from './services/workOrderRepository.js';
+import { canUserAccessWorkOrder, filterWorkOrdersForUser, getDashboardSummary } from './services/dashboardService.js';
+import { WorkOrderService } from './services/workOrderService.js';
+import { UssdService } from './services/ussdService.js';
+import { createUssdRepository } from './services/ussdRepository.js';
 
 assertServerConfig();
 
+declare module 'express' {
+  interface Request {
+    user?: AppUser;
+  }
+}
+
 const app = express();
 const port = config.port;
+const authService = new AuthService(createAuthRepository());
 const africaTalkingProvider = createAfricaTalkingProvider(config.africaTalking);
+const inventoryRepository = createInventoryRepository();
+const workOrderRepository = createWorkOrderRepository();
+const inventoryService = new InventoryService(inventoryRepository, {
+  async sendSms(payload) {
+    return africaTalkingProvider.sendSms(payload);
+  },
+});
+const workOrderService = new WorkOrderService(workOrderRepository, {
+  async sendSms(payload) {
+    return africaTalkingProvider.sendSms(payload);
+  },
+});
+const ussdRepository = createUssdRepository();
+const ussdService = new UssdService({
+  repository: ussdRepository,
+  smsProvider: {
+    async sendSms(payload) {
+      return africaTalkingProvider.sendSms(payload);
+    },
+  },
+});
 
 app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false }));
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  const configuredOrigins = (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const allowedOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000', ...configuredOrigins];
+
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+
+  next();
+});
+
+function getBearerToken(req: Request): string | null {
+  const authHeader = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+  if (authHeader.startsWith('Bearer ')) {
+    return authHeader.slice('Bearer '.length).trim();
+  }
+
+  const tokenValue = typeof req.body?.token === 'string' ? req.body.token : null;
+  return tokenValue && tokenValue.trim() ? tokenValue.trim() : null;
+}
+
+async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const token = getBearerToken(req);
+  let user: AppUser | null;
+
+  try {
+    user = await authService.getUserByToken(token);
+  } catch (error) {
+    next(error);
+    return;
+  }
+
+  if (!user) {
+    res.status(401).json({ ok: false, message: 'Authentication required.' });
+    return;
+  }
+
+  req.user = user;
+  next();
+}
 
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   void next;
@@ -50,6 +142,77 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  const session = await authService.login(email, password);
+
+  if (!session) {
+    res.status(401).json({ ok: false, message: 'Invalid credentials.' });
+    return;
+  }
+
+  res.status(200).json({
+    ok: true,
+    data: {
+      token: session.token,
+      user: session.user,
+    },
+  });
+});
+
+app.post('/api/auth/logout', async (req: Request, res: Response) => {
+  const token = getBearerToken(req);
+  const loggedOut = await authService.logout(token);
+
+  if (!loggedOut) {
+    res.status(400).json({ ok: false, message: 'No active session to log out.' });
+    return;
+  }
+
+  res.status(200).json({ ok: true, message: 'Logged out.' });
+});
+
+app.get('/api/auth/me', requireAuth, (req: Request, res: Response) => {
+  const user = req.user;
+  res.status(200).json({ ok: true, data: user });
+});
+
+app.get('/api/users', requireAuth, async (req: Request, res: Response) => {
+  const roleFilter = typeof req.query.role === 'string' ? req.query.role : undefined;
+  const allowedRoleFilter = roleFilter && ['manager', 'operations', 'technician'].includes(roleFilter) ? roleFilter as AppUser['role'] : undefined;
+
+  const user = req.user ?? null;
+  if (!user) {
+    res.status(401).json({ ok: false, message: 'Authentication required.' });
+    return;
+  }
+
+  if (!['manager', 'operations'].includes(user.role)) {
+    res.status(200).json({ ok: true, data: [] });
+    return;
+  }
+
+  const users = await authService.getOrganizationUsers(user.organization_id, allowedRoleFilter, user);
+  res.status(200).json({ ok: true, data: users });
+});
+
+app.get('/api/dashboard/summary', requireAuth, async (req: Request, res: Response) => {
+  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+  const priority = typeof req.query.priority === 'string' ? req.query.priority : undefined;
+  const workOrders = await workOrderService.listWorkOrders();
+  const currentUser = req.user ?? null;
+  const scoped = filterWorkOrdersForUser(workOrders, currentUser, { status, priority });
+
+  res.status(200).json({
+    ok: true,
+    data: {
+      summary: getDashboardSummary(scoped),
+      workOrders: scoped,
+    },
+  });
+});
+
 app.post('/dev/at/sandbox/sms-test', async (req: Request, res: Response) => {
   const payload = typeof req.body === 'object' && req.body !== null ? req.body : {};
   const recipient = typeof payload.recipient === 'string' ? payload.recipient : '';
@@ -67,7 +230,163 @@ app.post('/dev/at/sandbox/sms-test', async (req: Request, res: Response) => {
   });
 });
 
-app.listen(port, () => {
+app.post(['/api/ussd/callback', '/api/africastalking/ussd', '/api/webhooks/africas-talking/ussd'], async (req: Request, res: Response) => {
+  const payload = typeof req.body === 'object' && req.body !== null ? req.body as Record<string, unknown> : {};
+  const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : typeof payload.session_id === 'string' ? payload.session_id : `ussd-${Date.now()}`;
+  const serviceCode = typeof payload.serviceCode === 'string' ? payload.serviceCode : typeof payload.service_code === 'string' ? payload.service_code : '*123#';
+  const phoneNumber = typeof payload.phoneNumber === 'string' ? payload.phoneNumber : typeof payload.phone_number === 'string' ? payload.phone_number : '';
+  const text = typeof payload.text === 'string' ? payload.text : typeof payload.ussdString === 'string' ? payload.ussdString : '';
+
+  const responseText = await ussdService.processCallback({
+    sessionId,
+    serviceCode,
+    phoneNumber,
+    text,
+  });
+
+  res.setHeader('Content-Type', 'text/plain');
+  return res.status(200).send(responseText);
+});
+
+app.get('/api/inventory', async (_req: Request, res: Response) => {
+  const items = await inventoryService.listInventoryItems();
+  res.status(200).json({ ok: true, data: items });
+});
+
+app.post('/api/inventory/alerts/trigger', async (_req: Request, res: Response) => {
+  const summary = await inventoryService.triggerLowStockAlerts();
+  res.status(200).json({ ok: true, data: summary });
+});
+
+app.get('/api/inventory/alerts', async (_req: Request, res: Response) => {
+  const alerts = await inventoryService.listAlerts();
+  res.status(200).json({ ok: true, data: alerts });
+});
+
+app.get('/api/inventory/:id', async (req: Request, res: Response) => {
+  const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const item = await inventoryService.getInventoryItemById(itemId);
+
+  if (!item) {
+    res.status(404).json({ ok: false, message: 'Inventory item not found.' });
+    return;
+  }
+
+  res.status(200).json({ ok: true, data: item });
+});
+
+app.post('/api/inventory', async (req: Request, res: Response) => {
+  try {
+    const item = await inventoryService.createInventoryItem(req.body ?? {});
+    res.status(201).json({ ok: true, data: item });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to create inventory item.';
+    res.status(400).json({ ok: false, message });
+  }
+});
+
+app.patch('/api/inventory/:id/quantity', async (req: Request, res: Response) => {
+  try {
+    const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const quantity = Number(req.body?.quantity ?? req.body?.quantity_available ?? 0);
+    const item = await inventoryService.updateInventoryQuantity(itemId, quantity);
+    res.status(200).json({ ok: true, data: item });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to update quantity.';
+    res.status(400).json({ ok: false, message });
+  }
+});
+
+app.get('/api/contacts', async (_req: Request, res: Response) => {
+  const contacts = await inventoryService.listContacts();
+  res.status(200).json({ ok: true, data: contacts });
+});
+
+app.post('/api/contacts', async (req: Request, res: Response) => {
+  try {
+    const contact = await inventoryService.createContact(req.body ?? {});
+    res.status(201).json({ ok: true, data: contact });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to create contact.';
+    res.status(400).json({ ok: false, message });
+  }
+});
+
+app.get('/api/work-orders', requireAuth, async (req: Request, res: Response) => {
+  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+  const priority = typeof req.query.priority === 'string' ? req.query.priority : undefined;
+  const workOrders = await workOrderService.listWorkOrders();
+  const currentUser = req.user ?? null;
+  const visible = filterWorkOrdersForUser(workOrders, currentUser, { status, priority });
+
+  res.status(200).json({ ok: true, data: visible });
+});
+
+app.get('/api/work-orders/:id', requireAuth, async (req: Request, res: Response) => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const workOrder = await workOrderService.getWorkOrderById(id);
+
+  if (!workOrder) {
+    res.status(404).json({ ok: false, message: 'Work order not found.' });
+    return;
+  }
+
+  const currentUser = req.user ?? null;
+  if (!canUserAccessWorkOrder(currentUser, workOrder)) {
+    res.status(403).json({ ok: false, message: 'Work order not available in your organization or role.' });
+    return;
+  }
+
+  res.status(200).json({ ok: true, data: workOrder });
+});
+
+app.post('/api/work-orders', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const workOrder = await workOrderService.createWorkOrder(req.body ?? {});
+    res.status(201).json({ ok: true, data: workOrder });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to create work order.';
+    res.status(400).json({ ok: false, message });
+  }
+});
+
+app.patch('/api/work-orders/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const workOrder = await workOrderService.updateWorkOrder(id, req.body ?? {});
+    res.status(200).json({ ok: true, data: workOrder });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to update work order.';
+    res.status(400).json({ ok: false, message });
+  }
+});
+
+app.post('/api/work-orders/:id/assign', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const assigneeId = typeof req.body?.assignee_id === 'string' ? req.body.assignee_id : '';
+    const phoneNumber = typeof req.body?.assignee_phone_number === 'string' ? req.body.assignee_phone_number : null;
+    const workOrder = await workOrderService.assignWorkOrder(id, assigneeId, phoneNumber);
+    res.status(200).json({ ok: true, data: workOrder });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to assign work order.';
+    res.status(400).json({ ok: false, message });
+  }
+});
+
+app.post('/api/work-orders/:id/status', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const newStatus = typeof req.body?.status === 'string' ? req.body.status : '';
+    const workOrder = await workOrderService.updateWorkOrderStatus(id, newStatus);
+    res.status(200).json({ ok: true, data: workOrder });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to update work order status.';
+    res.status(400).json({ ok: false, message });
+  }
+});
+
+app.listen(port, '0.0.0.0', () => {
   console.log(`FactoryLink API listening on port ${port}`);
   console.log('Africa\'s Talking sandbox readiness:', africaTalkingProvider.getDiagnostics());
 });

@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: factorylink-api
+    runtime: node
+    buildCommand: npm ci && npm run build:server
+    startCommand: node dist/server/src/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: AT_ENVIRONMENT
+        value: sandbox
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: AT_BASE_URL
+        value: https://api.africastalking.com
+      - key: AT_SENDER_ID
+        value: FactoryLink
+      - key: CORS_ORIGIN
+        sync: false
+
+  - type: web
+    name: factorylink-web
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false

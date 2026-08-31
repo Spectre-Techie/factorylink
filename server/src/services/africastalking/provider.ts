@@ -284,7 +284,7 @@ export class AfricaTalkingProviderImpl implements AfricaTalkingProvider {
     }
 
     try {
-      const providerResponse = await smsClient.send({
+      await smsClient.send({
         to: recipient,
         message,
         senderId,
@@ -300,7 +300,6 @@ export class AfricaTalkingProviderImpl implements AfricaTalkingProvider {
           endpointType: 'development-sandbox-test',
           environment: this.config.environment,
           sandboxMode: true,
-          providerResponse,
         },
       };
     } catch (error) {
