@@ -51,6 +51,12 @@ export interface AfricaTalkingProvider {
   getDiagnostics(): AfricaTalkingDiagnostics;
 }
 
+interface VoiceCallPayload {
+  callFrom: string;
+  callTo: string;
+  clientRequestId?: string;
+}
+
 function maskSecret(secret: string): string {
   const trimmed = secret.trim();
 
@@ -180,7 +186,9 @@ function buildSdkClient({ username, apiKey }: Pick<AfricaTalkingClientConfig, 'u
       }) => Promise<unknown>;
     };
     USSD: unknown;
-    VOICE: unknown;
+    VOICE: {
+      call: (payload: VoiceCallPayload) => Promise<unknown>;
+    };
     AIRTIME: unknown;
     TOKEN: unknown;
     APPLICATION: unknown;
@@ -330,7 +338,58 @@ export class AfricaTalkingProviderImpl implements AfricaTalkingProvider {
   }
 
   async initiateVoiceCall(payload: Record<string, unknown>): Promise<ProviderResponse> {
-    return this.createResponse('voice', 'Voice provider abstraction initialized.', payload);
+    const callFrom = typeof payload.callFrom === 'string' ? payload.callFrom.trim() : '';
+    const callTo = typeof payload.callTo === 'string' ? payload.callTo.trim() : '';
+    const clientRequestId = typeof payload.clientRequestId === 'string' ? payload.clientRequestId.trim() : undefined;
+
+    if (!callFrom || !callTo) {
+      return {
+        ok: false,
+        provider: 'africastalking',
+        type: 'voice',
+        message: 'Voice call requires callFrom and callTo phone numbers.',
+        requestId: this.makeRequestId(),
+      };
+    }
+
+    const voiceClient = this.client?.VOICE;
+    if (!voiceClient || typeof voiceClient.call !== 'function') {
+      return {
+        ok: false,
+        provider: 'africastalking',
+        type: 'voice',
+        message: 'Africa\'s Talking Voice client is not available.',
+        requestId: this.makeRequestId(),
+      };
+    }
+
+    try {
+      const providerResponse = await voiceClient.call({ callFrom, callTo, clientRequestId });
+      return {
+        ok: true,
+        provider: 'africastalking',
+        type: 'voice',
+        message: 'Voice call initiated successfully.',
+        requestId: this.makeRequestId(),
+        meta: { providerResponse: sanitizeForDebug(providerResponse) },
+      };
+    } catch (error) {
+      const sanitized = sanitizeError(error);
+      return {
+        ok: false,
+        provider: 'africastalking',
+        type: 'voice',
+        message: 'Voice call failed. Provider error details were sanitized for security.',
+        requestId: this.makeRequestId(),
+        meta: {
+          providerStatus: sanitized.status,
+          providerStatusText: sanitized.statusText,
+          providerErrorCode: sanitized.code,
+          providerErrorMessage: sanitized.message,
+          providerErrorBody: sanitized.providerErrorBody,
+        },
+      };
+    }
   }
 
   async sendAirtime(payload: Record<string, unknown>): Promise<ProviderResponse> {

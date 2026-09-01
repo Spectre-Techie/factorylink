@@ -22,6 +22,10 @@ services:
         value: https://api.africastalking.com
       - key: AT_SENDER_ID
         value: FactoryLink
+      - key: AT_VOICE_NUMBER
+        sync: false
+      - key: VOICE_CALLBACK_URL
+        sync: false
       - key: CORS_ORIGIN
         sync: false
 

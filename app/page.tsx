@@ -219,6 +219,23 @@ export default function HomePage() {
     }
   };
 
+  const handleVoiceCall = async (workOrderId: string) => {
+    if (!token) return;
+
+    setActionBusyId(workOrderId);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await request<{ message: string }>(`/api/work-orders/${workOrderId}/voice-call`, token, { method: 'POST' });
+      setNotice('Call initiated successfully.');
+    } catch (callError) {
+      setError(callError instanceof Error ? callError.message : 'Unable to initiate technician call.');
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
   const handleLogout = async () => {
     const activeToken = token;
     clearAuthentication();
@@ -372,6 +389,11 @@ export default function HomePage() {
                             <option key={nextStatus} value={nextStatus}>{statusLabel(nextStatus)}</option>
                           ))}
                         </select>
+                      )}
+                      {user.role !== 'technician' && workOrder.status === 'assigned' && /^\+[1-9]\d{7,14}$/.test(workOrder.assignee_phone_number ?? '') && (
+                        <button className="w-full rounded-lg border border-blue-200 px-2 py-2 text-left text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60" type="button" onClick={() => void handleVoiceCall(workOrder.id)} disabled={actionBusyId === workOrder.id}>
+                          {actionBusyId === workOrder.id ? 'Calling...' : 'Call technician'}
+                        </button>
                       )}
                       {actionBusyId === workOrder.id && <span className="text-[11px] font-medium text-slate-500">Updating…</span>}
                     </div>

@@ -11,6 +11,7 @@ import { canUserAccessWorkOrder, filterWorkOrdersForUser, getDashboardSummary } 
 import { WorkOrderService } from './services/workOrderService.js';
 import { UssdService } from './services/ussdService.js';
 import { createUssdRepository } from './services/ussdRepository.js';
+import { VoiceService } from './services/voiceService.js';
 
 assertServerConfig();
 
@@ -44,6 +45,22 @@ const ussdService = new UssdService({
       return africaTalkingProvider.sendSms(payload);
     },
   },
+});
+const voiceService = new VoiceService({
+  repository: workOrderRepository,
+  workOrderService,
+  voiceProvider: {
+    async initiateVoiceCall(payload) {
+      return africaTalkingProvider.initiateVoiceCall(payload);
+    },
+  },
+  smsProvider: {
+    async sendSms(payload) {
+      return africaTalkingProvider.sendSms(payload);
+    },
+  },
+  callerNumber: config.africaTalking.voiceNumber,
+  callbackUrl: config.africaTalking.voiceCallbackUrl,
 });
 
 app.use(express.json({ limit: '1mb' }));
@@ -246,6 +263,42 @@ app.post(['/api/ussd/callback', '/api/africastalking/ussd', '/api/webhooks/afric
 
   res.setHeader('Content-Type', 'text/plain');
   return res.status(200).send(responseText);
+});
+
+app.post('/api/work-orders/:id/voice-call', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const actor = req.user;
+    if (!actor) {
+      res.status(401).json({ ok: false, message: 'Authentication required.' });
+      return;
+    }
+
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const result = await voiceService.initiateWorkOrderCall(id, actor);
+    res.status(200).json({ ok: true, data: result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to initiate voice call.';
+    res.status(400).json({ ok: false, message });
+  }
+});
+
+app.post('/api/africastalking/voice', async (req: Request, res: Response) => {
+  try {
+    const payload = typeof req.body === 'object' && req.body !== null ? req.body as Record<string, unknown> : {};
+    const queryWorkOrderId = typeof req.query.workOrderId === 'string' ? req.query.workOrderId : undefined;
+    const response = await voiceService.handleCallback({
+      workOrderId: queryWorkOrderId ?? (typeof payload.workOrderId === 'string' ? payload.workOrderId : typeof payload.work_order_id === 'string' ? payload.work_order_id : undefined),
+      clientRequestId: typeof payload.clientRequestId === 'string' ? payload.clientRequestId : typeof payload.client_request_id === 'string' ? payload.client_request_id : undefined,
+      callSessionId: typeof payload.sessionId === 'string' ? payload.sessionId : typeof payload.session_id === 'string' ? payload.session_id : typeof payload.callSessionId === 'string' ? payload.callSessionId : undefined,
+      phoneNumber: typeof payload.callerNumber === 'string' ? payload.callerNumber : typeof payload.phoneNumber === 'string' ? payload.phoneNumber : undefined,
+      digits: typeof payload.dtmfDigits === 'string' ? payload.dtmfDigits : typeof payload.digits === 'string' ? payload.digits : undefined,
+    });
+    res.setHeader('Content-Type', 'application/xml');
+    res.status(200).send(response);
+  } catch {
+    res.setHeader('Content-Type', 'application/xml');
+    res.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response><Say>Unable to process this voice request.</Say></Response>');
+  }
 });
 
 app.get('/api/inventory', async (_req: Request, res: Response) => {

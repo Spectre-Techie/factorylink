@@ -20,6 +20,7 @@ export type DashboardWorkOrder = {
   priority: 'low' | 'medium' | 'high';
   status: 'pending' | 'assigned' | 'in_progress' | 'completed';
   assigned_to_user_id?: string | null;
+  assignee_phone_number?: string | null;
   due_at?: string | null;
   created_at: string;
 };

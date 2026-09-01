@@ -31,6 +31,8 @@ export const config = {
     apiKey: getStringEnv('AT_API_KEY'),
     baseUrl: process.env.AT_BASE_URL ?? 'https://api.africastalking.com',
     senderId: process.env.AT_SENDER_ID ?? 'FactoryLink',
+    voiceNumber: process.env.AT_VOICE_NUMBER ?? '',
+    voiceCallbackUrl: process.env.VOICE_CALLBACK_URL ?? `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000'}/api/africastalking/voice`,
   },
 };
 
