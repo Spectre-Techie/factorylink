@@ -40,6 +40,33 @@ export type DashboardReward = {
   updated_at: string;
 };
 
+export type DashboardInsights = {
+  summary: {
+    totalActiveWorkOrders: number;
+    pending: number;
+    assigned: number;
+    inProgress: number;
+    completed: number;
+    overdue: number;
+    unassignedPending: number;
+  };
+  inventoryRisk: {
+    lowStockItems: number;
+    criticalAlerts: number;
+    failedAlerts: number;
+    topItems: Array<{ id: string; name: string; quantityAvailable: number; reorderThreshold: number; unit: string }>;
+  };
+  workforce: { assigned: number; inProgress: number; completed: number };
+  distributorPerformance: {
+    totalSalesReports: number;
+    totalReportedAmount: number;
+    eligibleRewards: number;
+    totalRewardValue: number;
+    failedRewards: number;
+  };
+  attention: Array<{ priority: 'critical' | 'attention' | 'healthy'; category: string; title: string; message: string }>;
+};
+
 export type WorkOrderFilters = {
   status: string;
   priority: string;

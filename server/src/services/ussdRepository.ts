@@ -71,6 +71,7 @@ export interface UssdRepository {
     amount: number;
     status?: 'submitted' | 'rejected';
   }): Promise<SalesReportRecord>;
+  listSalesReportsForOrganization(organizationId: string): Promise<SalesReportRecord[]>;
 }
 
 class InMemoryUssdRepository implements UssdRepository {
@@ -206,6 +207,10 @@ class InMemoryUssdRepository implements UssdRepository {
     return record;
   }
 
+  async listSalesReportsForOrganization(organizationId: string): Promise<SalesReportRecord[]> {
+    return this.salesReports.filter((report) => report.organization_id === organizationId);
+  }
+
   private normalizePhone(phoneNumber: string): string {
     return (phoneNumber ?? '').replace(/\s+/g, '').trim();
   }
@@ -273,6 +278,11 @@ export function createUssdRepository(): UssdRepository {
         }).select().single();
         if (error) throw new Error(`Failed to create sales report: ${error.message}`);
         return data as SalesReportRecord;
+      },
+      async listSalesReportsForOrganization(organizationId: string) {
+        const { data, error } = await supabase.from('sales_reports').select('*').eq('organization_id', organizationId).order('created_at', { ascending: false });
+        if (error) throw new Error('Unable to list sales reports.');
+        return (data as SalesReportRecord[] | null) ?? [];
       },
     } satisfies UssdRepository;
   }

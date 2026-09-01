@@ -14,6 +14,7 @@ import { createUssdRepository } from './services/ussdRepository.js';
 import { VoiceService } from './services/voiceService.js';
 import { AirtimeService } from './services/airtimeService.js';
 import { createAirtimeRewardRepository } from './services/airtimeRepository.js';
+import { getOperationalInsights } from './services/insightsService.js';
 
 assertServerConfig();
 
@@ -252,6 +253,24 @@ app.get('/api/dashboard/summary', requireAuth, async (req: Request, res: Respons
       workOrders: scoped,
     },
   });
+});
+
+app.get('/api/dashboard/insights', requireAuth, async (req: Request, res: Response) => {
+  const user = req.user;
+  if (!user || !['manager', 'operations'].includes(user.role)) {
+    res.status(403).json({ ok: false, message: 'Operational insights access denied.' });
+    return;
+  }
+
+  const insights = await getOperationalInsights(user, {
+    listWorkOrders: () => workOrderRepository.listWorkOrders(),
+    listWorkOrderEvents: (workOrderId) => workOrderRepository.listWorkOrderEvents(workOrderId),
+    listInventoryItems: () => inventoryRepository.listInventoryItems(),
+    listInventoryAlerts: () => inventoryRepository.listAlerts(),
+    listSalesReportsForOrganization: (organizationId) => ussdRepository.listSalesReportsForOrganization(organizationId),
+    listRewardsForOrganization: (organizationId) => createAirtimeRewardRepository().listRewardsForOrganization(organizationId),
+  });
+  res.status(200).json({ ok: true, data: insights });
 });
 
 app.post('/dev/at/sandbox/sms-test', async (req: Request, res: Response) => {

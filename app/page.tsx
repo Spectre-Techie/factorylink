@@ -6,6 +6,7 @@ import {
   defaultFilters,
   filterVisibleWorkOrders,
   roleLabel,
+  type DashboardInsights,
   type DashboardSummary,
   type DashboardReward,
   type DashboardUser,
@@ -72,6 +73,9 @@ export default function HomePage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [workOrders, setWorkOrders] = useState<DashboardWorkOrder[]>([]);
   const [rewards, setRewards] = useState<DashboardReward[]>([]);
+  const [insights, setInsights] = useState<DashboardInsights | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
   const [organizationTechnicians, setOrganizationTechnicians] = useState<OrganizationUser[]>([]);
   const [filters, setFilters] = useState<WorkOrderFilters>(defaultFilters);
   const [email, setEmail] = useState('');
@@ -106,6 +110,17 @@ export default function HomePage() {
     setWorkOrders(visibleWorkOrders);
     setOrganizationTechnicians(technicians);
     setRewards(visibleRewards);
+    if (currentUser.role !== 'technician') {
+      setInsightsLoading(true);
+      setInsightsError(null);
+      try {
+        setInsights(await request<DashboardInsights>('/api/dashboard/insights', activeToken));
+      } catch {
+        setInsightsError('Operational insights are temporarily unavailable.');
+      } finally {
+        setInsightsLoading(false);
+      }
+    }
   };
 
   useEffect(() => {
@@ -344,6 +359,48 @@ export default function HomePage() {
           <p className="text-sm font-medium text-slate-500">Priority breakdown</p>
           <div className="mt-2 flex gap-5 text-sm text-slate-700"><span>High <strong>{summary.byPriority.high}</strong></span><span>Medium <strong>{summary.byPriority.medium}</strong></span><span>Low <strong>{summary.byPriority.low}</strong></span></div>
         </div>
+
+        {user.role !== 'technician' && (
+          <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Operational Insights</h2>
+                <p className="text-sm text-slate-500">A current view of work health, inventory risk, and distributor performance.</p>
+              </div>
+              {insightsLoading && <span className="text-sm font-medium text-slate-500">Loading...</span>}
+            </div>
+            {insightsError ? <p role="alert" className="mt-5 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{insightsError}</p> : insightsLoading ? <div className="mt-5 h-28 rounded-lg bg-slate-50" aria-label="Loading operational insights" /> : insights && (
+              <div className="mt-5 space-y-6">
+                <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  {[
+                    ['Active', insights.summary.totalActiveWorkOrders],
+                    ['Pending', insights.summary.pending],
+                    ['Assigned', insights.summary.assigned],
+                    ['In progress', insights.summary.inProgress],
+                    ['Completed', insights.summary.completed],
+                    ['Overdue', insights.summary.overdue],
+                  ].map(([label, value]) => <div key={label} className="rounded-lg bg-slate-50 px-3 py-3"><p className="text-xs font-medium text-slate-500">{label}</p><p className="mt-1 text-xl font-bold text-slate-950">{value}</p></div>)}
+                </div>
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Inventory Risk</h3>
+                    <div className="mt-3 grid grid-cols-3 gap-3 text-sm"><span>Low stock <strong>{insights.inventoryRisk.lowStockItems}</strong></span><span>Critical <strong>{insights.inventoryRisk.criticalAlerts}</strong></span><span>Failed alerts <strong>{insights.inventoryRisk.failedAlerts}</strong></span></div>
+                    {insights.inventoryRisk.topItems.length > 0 ? <ul className="mt-3 space-y-2 text-sm text-slate-700">{insights.inventoryRisk.topItems.map((item) => <li key={item.id} className="flex justify-between border-b border-slate-100 py-2"><span>{item.name}</span><strong>{item.quantityAvailable} / {item.reorderThreshold} {item.unit}</strong></li>)}</ul> : <p className="mt-3 text-sm text-slate-500">No inventory items require attention.</p>}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Distributor Performance</h3>
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4"><span>Reports <strong>{insights.distributorPerformance.totalSalesReports}</strong></span><span>Sales <strong>NGN {insights.distributorPerformance.totalReportedAmount}</strong></span><span>Rewards <strong>{insights.distributorPerformance.eligibleRewards}</strong></span><span>Value <strong>NGN {insights.distributorPerformance.totalRewardValue}</strong></span></div>
+                    <p className="mt-3 text-sm text-slate-500">Failed rewards: <strong className="text-slate-700">{insights.distributorPerformance.failedRewards}</strong></p>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Attention</h3>
+                  {insights.attention.length === 0 ? <p className="mt-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">No operational issues require attention.</p> : <ul className="mt-3 space-y-2">{insights.attention.map((item, index) => <li key={`${item.category}-${item.title}-${index}`} className="flex gap-3 rounded-lg bg-slate-50 px-3 py-3 text-sm"><span className="min-w-20 font-bold uppercase text-slate-600">{item.priority}</span><span><strong className="text-slate-900">{item.title}</strong><span className="block text-slate-600">{item.message}</span></span></li>)}</ul>}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         {user.role !== 'technician' && (
           <section className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
