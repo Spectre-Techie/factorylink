@@ -15,6 +15,7 @@ import { VoiceService } from './services/voiceService.js';
 import { AirtimeService } from './services/airtimeService.js';
 import { createAirtimeRewardRepository } from './services/airtimeRepository.js';
 import { getOperationalInsights } from './services/insightsService.js';
+import { SmsInboundService, createSmsInboundRepository } from './services/smsInboundService.js';
 
 assertServerConfig();
 
@@ -41,6 +42,19 @@ const workOrderService = new WorkOrderService(workOrderRepository, {
   },
 });
 const ussdRepository = createUssdRepository();
+const smsInboundService = new SmsInboundService({
+  repository: createSmsInboundRepository(),
+  lookupSenderByPhone: async (phoneNumber) => {
+    const distributor = await ussdRepository.findDistributorByPhone(phoneNumber);
+    if (!distributor) {
+      return null;
+    }
+    return {
+      id: distributor.id,
+      organization_id: distributor.organization_id,
+    };
+  },
+});
 const ussdService = new UssdService({
   repository: ussdRepository,
   smsProvider: {
@@ -287,6 +301,28 @@ app.post('/dev/at/sandbox/sms-test', async (req: Request, res: Response) => {
     note: 'This is a development/Sandbox test endpoint only and is not a production business endpoint.',
     ...response,
     environment: config.africaTalking.environment,
+  });
+});
+
+app.post('/api/africastalking/sms', async (req: Request, res: Response) => {
+  const payload = typeof req.body === 'object' && req.body !== null ? req.body as Record<string, unknown> : {};
+  const result = await smsInboundService.processIncomingMessage({
+    phoneNumber: typeof payload.phoneNumber === 'string' ? payload.phoneNumber : typeof payload.phone_number === 'string' ? payload.phone_number : undefined,
+    text: typeof payload.text === 'string' ? payload.text : undefined,
+    date: typeof payload.date === 'string' ? payload.date : undefined,
+    id: typeof payload.id === 'string' ? payload.id : typeof payload.message_id === 'string' ? payload.message_id : typeof payload.messageId === 'string' ? payload.messageId : undefined,
+    linkId: typeof payload.linkId === 'string' ? payload.linkId : typeof payload.link_id === 'string' ? payload.link_id : undefined,
+    to: typeof payload.to === 'string' ? payload.to : typeof payload.shortcode === 'string' ? payload.shortcode : undefined,
+    shortcode: typeof payload.shortcode === 'string' ? payload.shortcode : undefined,
+  });
+
+  return res.status(200).json({
+    ok: true,
+    data: result,
+    provider: 'africastalking',
+    type: 'sms',
+    endpoint: '/api/africastalking/sms',
+    ack: 'Inbound SMS callback acknowledged.',
   });
 });
 

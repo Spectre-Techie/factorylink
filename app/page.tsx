@@ -140,6 +140,15 @@ export default function HomePage() {
 
   const filteredWorkOrders = useMemo(() => filterVisibleWorkOrders(workOrders, filters), [workOrders, filters]);
   const assignees = useMemo(() => [...new Set(workOrders.map((item) => item.assigned_to_user_id).filter(Boolean))] as string[], [workOrders]);
+  const resolveAssigneeLabel = (assigneeId: string | null | undefined): string => {
+    if (!assigneeId) return 'Unassigned';
+    const technician = organizationTechnicians.find((person) => person.id === assigneeId);
+    return technician?.name ?? 'Unassigned';
+  };
+
+  useEffect(() => {
+    document.title = user ? 'FactoryLink — Operations' : 'FactoryLink — Operations';
+  }, [user]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -277,7 +286,7 @@ export default function HomePage() {
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10">
         <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">FactoryLink</p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Operations sign in</h1>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">FactoryLink Operations</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">Use your operational account to access organization-scoped work orders.</p>
           <form className="mt-7 space-y-4" onSubmit={handleLogin}>
             <label className="block text-sm font-medium text-slate-700">Email
@@ -302,12 +311,12 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">FactoryLink</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Operational dashboard</h1>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Operations Dashboard</h1>
           </div>
           <div className="flex items-center justify-between gap-4 sm:justify-end">
             <div className="text-right text-sm">
               <p className="font-semibold text-slate-900">{user.name}</p>
-              <p className="text-slate-500">{roleLabel(user.role)} · Org {user.organization_id.slice(0, 8)}</p>
+              <p className="text-slate-500">{roleLabel(user.role)} · FactoryLink</p>
             </div>
             <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={handleLogout}>Log out</button>
           </div>
@@ -437,7 +446,7 @@ export default function HomePage() {
                   <td className="px-5 py-4 font-medium text-slate-900">{workOrder.title}</td>
                   <td className="px-5 py-4 capitalize">{workOrder.priority}</td>
                   <td className="px-5 py-4">{statusLabel(workOrder.status)}</td>
-                  <td className="px-5 py-4">{workOrder.assigned_to_user_id ?? 'Unassigned'}</td>
+                  <td className="px-5 py-4">{resolveAssigneeLabel(workOrder.assigned_to_user_id)}</td>
                   <td className="px-5 py-4">{formatDate(workOrder.due_at)}</td>
                   <td className="px-5 py-4">{formatDate(workOrder.created_at)}</td>
                   <td className="px-5 py-4">
