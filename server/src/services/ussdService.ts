@@ -133,7 +133,7 @@ export class UssdService {
         return await this.handleOrderSummary(session, tokens[0] ?? '');
       }
       case 'lookup_order': {
-        return await this.lookupOrder(session, tokens.join('*'));
+        return await this.lookupOrder(session, tokens[tokens.length - 1] ?? '');
       }
       case 'stock_select': {
         return await this.handleStockLookup(session, tokens[0] ?? '');

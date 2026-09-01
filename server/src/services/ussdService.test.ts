@@ -311,6 +311,40 @@ test('my orders can look up a valid order by order number', async () => {
   assert.match(response, /Status: Pending/i);
 });
 
+test('my orders shows the order prompt for the initial menu input', async () => {
+  const service = makeService();
+  const response = await service.processCallback({
+    sessionId: 'sess-my-order-prompt',
+    serviceCode: '*123#',
+    phoneNumber: '+254700000001',
+    text: '2',
+  });
+
+  assert.match(response, /Enter order ID/i);
+});
+
+test('my orders extracts the order number from cumulative USSD input', async () => {
+  const service = makeService();
+  await service.processCallback({
+    sessionId: 'sess-my-order-cumulative',
+    serviceCode: '*123#',
+    phoneNumber: '+254700000001',
+    text: '2',
+  });
+
+  const response = await service.processCallback({
+    sessionId: 'sess-my-order-cumulative',
+    serviceCode: '*123#',
+    phoneNumber: '+254700000001',
+    text: '2*FL-1001',
+  });
+
+  assert.match(response, /Order #FL-1001/i);
+  assert.match(response, /Product: Phase 6 Product A/i);
+  assert.match(response, /Quantity: 20/i);
+  assert.match(response, /Status: Pending/i);
+});
+
 test('unknown order returns a not-found message', async () => {
   const service = makeService();
   const response = await service.processCallback({
