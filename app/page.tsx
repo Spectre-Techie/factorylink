@@ -7,6 +7,7 @@ import {
   filterVisibleWorkOrders,
   roleLabel,
   type DashboardSummary,
+  type DashboardReward,
   type DashboardUser,
   type DashboardWorkOrder,
   type WorkOrderFilters,
@@ -70,6 +71,7 @@ export default function HomePage() {
   const [user, setUser] = useState<DashboardUser | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [workOrders, setWorkOrders] = useState<DashboardWorkOrder[]>([]);
+  const [rewards, setRewards] = useState<DashboardReward[]>([]);
   const [organizationTechnicians, setOrganizationTechnicians] = useState<OrganizationUser[]>([]);
   const [filters, setFilters] = useState<WorkOrderFilters>(defaultFilters);
   const [email, setEmail] = useState('');
@@ -91,10 +93,11 @@ export default function HomePage() {
 
   const loadDashboard = async (activeToken: string) => {
     const currentUser = await request<DashboardUser>('/api/auth/me', activeToken);
-    const [dashboard, visibleWorkOrders, technicians] = await Promise.all([
+    const [dashboard, visibleWorkOrders, technicians, visibleRewards] = await Promise.all([
       request<DashboardResponse>('/api/dashboard/summary', activeToken),
       request<DashboardWorkOrder[]>('/api/work-orders', activeToken),
       currentUser.role === 'technician' ? Promise.resolve([]) : request<OrganizationUser[]>(`/api/users?role=technician`, activeToken),
+      currentUser.role === 'technician' ? Promise.resolve([]) : request<DashboardReward[]>('/api/distributor/rewards', activeToken),
     ]);
 
     setToken(activeToken);
@@ -102,6 +105,7 @@ export default function HomePage() {
     setSummary(dashboard.summary);
     setWorkOrders(visibleWorkOrders);
     setOrganizationTechnicians(technicians);
+    setRewards(visibleRewards);
   };
 
   useEffect(() => {
@@ -340,6 +344,20 @@ export default function HomePage() {
           <p className="text-sm font-medium text-slate-500">Priority breakdown</p>
           <div className="mt-2 flex gap-5 text-sm text-slate-700"><span>High <strong>{summary.byPriority.high}</strong></span><span>Medium <strong>{summary.byPriority.medium}</strong></span><span>Low <strong>{summary.byPriority.low}</strong></span></div>
         </div>
+
+        {user.role !== 'technician' && (
+          <section className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-5 py-5">
+              <h2 className="text-lg font-bold text-slate-950">Distributor Rewards</h2>
+              <p className="text-sm text-slate-500">Organization-scoped sales reporting incentives.</p>
+            </div>
+            {rewards.length === 0 ? <p className="px-5 py-8 text-center text-sm text-slate-500">No distributor rewards yet.</p> : (
+              <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Distributor</th><th className="px-5 py-3">Sales amount</th><th className="px-5 py-3">Reward</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Created</th></tr></thead><tbody className="divide-y divide-slate-100">{rewards.map((reward) => (
+                <tr key={reward.id} className="text-slate-700"><td className="px-5 py-4 font-medium text-slate-900">{reward.distributor_id}</td><td className="px-5 py-4">{reward.currency} {reward.sales_amount ?? '—'}</td><td className="px-5 py-4">{reward.currency} {reward.amount}</td><td className="px-5 py-4 capitalize">{reward.status}</td><td className="px-5 py-4">{formatDate(reward.created_at)}</td></tr>
+              ))}</tbody></table></div>
+            )}
+          </section>
+        )}
 
         <section className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-5 py-5">

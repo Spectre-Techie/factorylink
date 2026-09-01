@@ -25,6 +25,20 @@ export type DashboardWorkOrder = {
   created_at: string;
 };
 
+export type DashboardReward = {
+  id: string;
+  distributor_id: string;
+  sales_report_id: string;
+  sales_amount?: number;
+  phone_number: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'sent' | 'failed';
+  provider_reference: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WorkOrderFilters = {
   status: string;
   priority: string;

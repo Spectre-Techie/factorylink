@@ -11,6 +11,10 @@ interface SmsProvider {
   sendSms(payload: Record<string, unknown>): Promise<{ ok: boolean; provider: string; type: string; message: string; requestId?: string; meta?: Record<string, unknown> }>;
 }
 
+interface AirtimeRewardService {
+  processSalesReportReward(salesReportId: string): Promise<{ eligible: boolean; reward: { amount: number; status: string } | null }>;
+}
+
 interface UssdSessionState {
   sessionId: string;
   phoneNumber: string;
@@ -31,6 +35,7 @@ export class UssdService {
     private readonly config: {
       repository: UssdRepository;
       smsProvider: SmsProvider;
+      airtimeService?: AirtimeRewardService;
     },
   ) {}
 
@@ -338,14 +343,27 @@ export class UssdService {
 
   private async handleSalesConfirmation(session: UssdSessionState, rawChoice: string): Promise<string> {
     if (rawChoice === '1' && typeof session.salesAmount === 'number' && session.organizationId && session.distributorId) {
-      await this.config.repository.createSalesReport({
+      const salesReport = await this.config.repository.createSalesReport({
         organization_id: session.organizationId,
         distributor_id: session.distributorId,
         amount: session.salesAmount,
         status: 'submitted',
       });
+      let response = 'END Sales report recorded.';
+      if (this.config.airtimeService) {
+        try {
+          const rewardResult = await this.config.airtimeService.processSalesReportReward(salesReport.id);
+          if (rewardResult.eligible && rewardResult.reward) {
+            response += rewardResult.reward.status === 'sent'
+              ? `\nYou qualified for NGN ${rewardResult.reward.amount} airtime.`
+              : '\nYour airtime reward is pending processing.';
+          }
+        } catch {
+          response += '\nYour airtime reward is pending processing.';
+        }
+      }
       this.sessions.delete(session.sessionId);
-      return 'END Sales report recorded.';
+      return response;
     }
 
     if (rawChoice === '2') {

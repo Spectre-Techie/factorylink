@@ -57,6 +57,11 @@ interface VoiceCallPayload {
   clientRequestId?: string;
 }
 
+interface AirtimeSendPayload {
+  recipients: Array<{ phoneNumber: string; currencyCode: string; amount: number }>;
+  idempotencyKey?: string;
+}
+
 function maskSecret(secret: string): string {
   const trimmed = secret.trim();
 
@@ -189,7 +194,9 @@ function buildSdkClient({ username, apiKey }: Pick<AfricaTalkingClientConfig, 'u
     VOICE: {
       call: (payload: VoiceCallPayload) => Promise<unknown>;
     };
-    AIRTIME: unknown;
+    AIRTIME: {
+      send: (payload: AirtimeSendPayload) => Promise<unknown>;
+    };
     TOKEN: unknown;
     APPLICATION: unknown;
     INSIGHTS: unknown;
@@ -393,7 +400,47 @@ export class AfricaTalkingProviderImpl implements AfricaTalkingProvider {
   }
 
   async sendAirtime(payload: Record<string, unknown>): Promise<ProviderResponse> {
-    return this.createResponse('airtime', 'Airtime provider abstraction initialized.', payload);
+    const phoneNumber = typeof payload.phoneNumber === 'string' ? payload.phoneNumber.trim() : '';
+    const currencyCode = typeof payload.currencyCode === 'string' ? payload.currencyCode.trim() : '';
+    const amount = typeof payload.amount === 'number' ? payload.amount : Number(payload.amount);
+    const idempotencyKey = typeof payload.idempotencyKey === 'string' ? payload.idempotencyKey.trim() : undefined;
+
+    if (!phoneNumber || !currencyCode || !Number.isFinite(amount) || amount <= 0) {
+      return { ok: false, provider: 'africastalking', type: 'airtime', message: 'Airtime request is invalid.', requestId: this.makeRequestId() };
+    }
+
+    const airtimeClient = this.client?.AIRTIME;
+    if (!airtimeClient || typeof airtimeClient.send !== 'function') {
+      return { ok: false, provider: 'africastalking', type: 'airtime', message: 'Africa\'s Talking Airtime client is not available.', requestId: this.makeRequestId() };
+    }
+
+    try {
+      const providerResponse = await airtimeClient.send({
+        recipients: [{ phoneNumber, currencyCode, amount }],
+        idempotencyKey,
+      });
+      const responseRecord = providerResponse as Record<string, unknown>;
+      const transaction = Array.isArray(responseRecord.responses) ? responseRecord.responses[0] as Record<string, unknown> : responseRecord;
+      const providerReference = typeof transaction?.transactionId === 'string' ? transaction.transactionId : typeof transaction?.transaction_id === 'string' ? transaction.transaction_id : undefined;
+      return {
+        ok: true,
+        provider: 'africastalking',
+        type: 'airtime',
+        message: 'Airtime reward sent successfully.',
+        requestId: this.makeRequestId(),
+        meta: { providerReference, providerResponse: sanitizeForDebug(providerResponse) },
+      };
+    } catch (error) {
+      const sanitized = sanitizeError(error);
+      return {
+        ok: false,
+        provider: 'africastalking',
+        type: 'airtime',
+        message: 'Airtime reward failed. Provider error details were sanitized for security.',
+        requestId: this.makeRequestId(),
+        meta: { providerErrorCode: sanitized.code, providerErrorMessage: sanitized.message, providerErrorBody: sanitized.providerErrorBody },
+      };
+    }
   }
 
   private createResponse(type: ProviderType, message: string, payload: Record<string, unknown>): ProviderResponse {

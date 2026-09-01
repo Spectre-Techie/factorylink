@@ -52,6 +52,7 @@ export interface SalesReportRecord {
 
 export interface UssdRepository {
   findDistributorByPhone(phoneNumber: string): Promise<DistributorRecord | null>;
+  findDistributorById(distributorId: string): Promise<DistributorRecord | null>;
   listActiveProductsForOrganization(organizationId: string): Promise<ProductRecord[]>;
   getProductById(productId: string): Promise<ProductRecord | null>;
   getInventoryForProduct(organizationId: string, productId: string): Promise<InventorySnapshot | null>;
@@ -130,6 +131,10 @@ class InMemoryUssdRepository implements UssdRepository {
   async findDistributorByPhone(phoneNumber: string): Promise<DistributorRecord | null> {
     const normalized = this.normalizePhone(phoneNumber);
     return this.distributors.find((distributor) => this.normalizePhone(distributor.phone_number) === normalized) ?? null;
+  }
+
+  async findDistributorById(distributorId: string): Promise<DistributorRecord | null> {
+    return this.distributors.find((distributor) => distributor.id === distributorId) ?? null;
   }
 
   async listActiveProductsForOrganization(organizationId: string): Promise<ProductRecord[]> {
@@ -219,6 +224,11 @@ export function createUssdRepository(): UssdRepository {
       async findDistributorByPhone(phoneNumber: string) {
         const { data, error } = await supabase.from('distributor_profiles').select('*').eq('phone_number', phoneNumber).maybeSingle();
         if (error) throw new Error(`Failed to find distributor: ${error.message}`);
+        return (data as DistributorRecord | null) ?? null;
+      },
+      async findDistributorById(distributorId: string) {
+        const { data, error } = await supabase.from('distributor_profiles').select('*').eq('id', distributorId).maybeSingle();
+        if (error) throw new Error('Unable to resolve distributor.');
         return (data as DistributorRecord | null) ?? null;
       },
       async listActiveProductsForOrganization(organizationId: string) {

@@ -12,6 +12,8 @@ import { WorkOrderService } from './services/workOrderService.js';
 import { UssdService } from './services/ussdService.js';
 import { createUssdRepository } from './services/ussdRepository.js';
 import { VoiceService } from './services/voiceService.js';
+import { AirtimeService } from './services/airtimeService.js';
+import { createAirtimeRewardRepository } from './services/airtimeRepository.js';
 
 assertServerConfig();
 
@@ -45,6 +47,14 @@ const ussdService = new UssdService({
       return africaTalkingProvider.sendSms(payload);
     },
   },
+  airtimeService: new AirtimeService({
+    repository: createAirtimeRewardRepository(),
+    provider: {
+      async sendAirtime(payload) {
+        return africaTalkingProvider.sendAirtime(payload);
+      },
+    },
+  }),
 });
 const voiceService = new VoiceService({
   repository: workOrderRepository,
@@ -212,6 +222,20 @@ app.get('/api/users', requireAuth, async (req: Request, res: Response) => {
 
   const users = await authService.getOrganizationUsers(user.organization_id, allowedRoleFilter, user);
   res.status(200).json({ ok: true, data: users });
+});
+
+app.get('/api/distributor/rewards', requireAuth, async (req: Request, res: Response) => {
+  const user = req.user;
+  if (!user || !['manager', 'operations'].includes(user.role)) {
+    res.status(403).json({ ok: false, message: 'Reward access denied.' });
+    return;
+  }
+
+  const rewards = await new AirtimeService({
+    repository: createAirtimeRewardRepository(),
+    provider: { sendAirtime: async () => ({ ok: false, provider: 'africastalking', type: 'airtime', message: 'Not available.' }) },
+  }).listRewardsForOrganization(user.organization_id);
+  res.status(200).json({ ok: true, data: rewards.map(({ id, distributor_id, sales_report_id, phone_number, amount, currency, status, provider_reference, created_at, updated_at, sales_amount }) => ({ id, distributor_id, sales_report_id, phone_number, amount, currency, status, provider_reference, created_at, updated_at, sales_amount })) });
 });
 
 app.get('/api/dashboard/summary', requireAuth, async (req: Request, res: Response) => {
