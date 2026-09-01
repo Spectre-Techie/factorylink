@@ -235,7 +235,7 @@ app.get('/api/distributor/rewards', requireAuth, async (req: Request, res: Respo
     repository: createAirtimeRewardRepository(),
     provider: { sendAirtime: async () => ({ ok: false, provider: 'africastalking', type: 'airtime', message: 'Not available.' }) },
   }).listRewardsForOrganization(user.organization_id);
-  res.status(200).json({ ok: true, data: rewards.map(({ id, distributor_id, sales_report_id, phone_number, amount, currency, status, provider_reference, created_at, updated_at, sales_amount }) => ({ id, distributor_id, sales_report_id, phone_number, amount, currency, status, provider_reference, created_at, updated_at, sales_amount })) });
+  res.status(200).json({ ok: true, data: rewards.map(({ id, distributor_id, distributor_name, sales_report_id, phone_number, amount, currency, status, provider_reference, created_at, updated_at, sales_amount }) => ({ id, distributor_id, distributor_name, sales_report_id, phone_number, amount, currency, status, provider_reference, created_at, updated_at, sales_amount })) });
 });
 
 app.get('/api/dashboard/summary', requireAuth, async (req: Request, res: Response) => {

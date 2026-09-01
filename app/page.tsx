@@ -353,7 +353,7 @@ export default function HomePage() {
             </div>
             {rewards.length === 0 ? <p className="px-5 py-8 text-center text-sm text-slate-500">No distributor rewards yet.</p> : (
               <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Distributor</th><th className="px-5 py-3">Sales amount</th><th className="px-5 py-3">Reward</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Created</th></tr></thead><tbody className="divide-y divide-slate-100">{rewards.map((reward) => (
-                <tr key={reward.id} className="text-slate-700"><td className="px-5 py-4 font-medium text-slate-900">{reward.distributor_id}</td><td className="px-5 py-4">{reward.currency} {reward.sales_amount ?? '—'}</td><td className="px-5 py-4">{reward.currency} {reward.amount}</td><td className="px-5 py-4 capitalize">{reward.status}</td><td className="px-5 py-4">{formatDate(reward.created_at)}</td></tr>
+                <tr key={reward.id} className="text-slate-700"><td className="px-5 py-4 font-medium text-slate-900">{reward.distributor_name ?? reward.distributor_id}</td><td className="px-5 py-4">{reward.currency} {reward.sales_amount ?? '—'}</td><td className="px-5 py-4">{reward.currency} {reward.amount}</td><td className="px-5 py-4 capitalize">{reward.status}</td><td className="px-5 py-4">{formatDate(reward.created_at)}</td></tr>
               ))}</tbody></table></div>
             )}
           </section>

@@ -28,6 +28,7 @@ export type DashboardWorkOrder = {
 export type DashboardReward = {
   id: string;
   distributor_id: string;
+  distributor_name?: string;
   sales_report_id: string;
   sales_amount?: number;
   phone_number: string;

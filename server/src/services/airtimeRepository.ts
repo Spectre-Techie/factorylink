@@ -18,6 +18,7 @@ export interface AirtimeReward {
   created_at: string;
   updated_at: string;
   sales_amount?: number;
+  distributor_name?: string;
 }
 
 export interface AirtimeRewardRepository {
@@ -113,11 +114,12 @@ export function createAirtimeRewardRepository(): AirtimeRewardRepository {
         return data as AirtimeReward;
       },
       async listRewardsForOrganization(organizationId) {
-        const { data, error } = await supabase.from('airtime_rewards').select('*, sales_reports(amount)').eq('organization_id', organizationId).order('created_at', { ascending: false });
+        const { data, error } = await supabase.from('airtime_rewards').select('*, sales_reports(amount), distributor_profiles(name)').eq('organization_id', organizationId).order('created_at', { ascending: false });
         if (error) throw new Error('Unable to list airtime rewards.');
-        return ((data ?? []) as Array<AirtimeReward & { sales_reports?: { amount?: number } | null }>).map(({ sales_reports, ...reward }) => ({
+        return ((data ?? []) as Array<AirtimeReward & { sales_reports?: { amount?: number } | null; distributor_profiles?: { name?: string } | null }>).map(({ sales_reports, distributor_profiles, ...reward }) => ({
           ...reward,
           sales_amount: sales_reports?.amount,
+          distributor_name: distributor_profiles?.name,
         }));
       },
     };
