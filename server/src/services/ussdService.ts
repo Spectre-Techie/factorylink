@@ -124,25 +124,25 @@ export class UssdService {
 
     switch (session.step) {
       case 'product_list': {
-        return await this.handleProductSelection(session, tokens[0] ?? '');
+        return await this.handleProductSelection(session, tokens[tokens.length - 1] ?? '');
       }
       case 'quantity_entry': {
-        return await this.handleQuantityInput(session, tokens[0] ?? '');
+        return await this.handleQuantityInput(session, tokens[tokens.length - 1] ?? '');
       }
       case 'order_summary': {
-        return await this.handleOrderSummary(session, tokens[0] ?? '');
+        return await this.handleOrderSummary(session, tokens[tokens.length - 1] ?? '');
       }
       case 'lookup_order': {
         return await this.lookupOrder(session, tokens[tokens.length - 1] ?? '');
       }
       case 'stock_select': {
-        return await this.handleStockLookup(session, tokens[0] ?? '');
+        return await this.handleStockLookup(session, tokens[tokens.length - 1] ?? '');
       }
       case 'sales_amount': {
-        return this.handleSalesInput(session, tokens[0] ?? '');
+        return this.handleSalesInput(session, tokens[tokens.length - 1] ?? '');
       }
       case 'sales_confirm': {
-        return await this.handleSalesConfirmation(session, tokens[0] ?? '');
+        return await this.handleSalesConfirmation(session, tokens[tokens.length - 1] ?? '');
       }
       default: {
         return 'CON Invalid selection. Please choose a number from 1 to 5.';

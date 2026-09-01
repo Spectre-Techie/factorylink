@@ -377,7 +377,7 @@ test('check stock returns real available inventory', async () => {
     sessionId: 'sess-stock',
     serviceCode: '*123#',
     phoneNumber: '+254700000001',
-    text: '1',
+    text: '3*1',
   });
 
   assert.match(response, /Phase 6 Product A/i);
@@ -392,11 +392,58 @@ test('report sales can accept a valid amount and persist it', async () => {
     sessionId: 'sess-sales',
     serviceCode: '*123#',
     phoneNumber: '+254700000001',
-    text: '450000',
+    text: '4*450000',
   });
 
   assert.match(response, /Sales amount:/i);
   assert.match(response, /NGN 450000/i);
+});
+
+test('report sales confirms with cumulative input', async () => {
+  let recordedAmount: number | undefined;
+  const service = makeService({
+    repository: {
+      createSalesReport: async (input: Record<string, unknown>) => {
+        recordedAmount = Number(input.amount);
+        return {
+          id: 'sales-cumulative',
+          organization_id: input.organization_id,
+          distributor_id: input.distributor_id,
+          amount: input.amount,
+          status: input.status,
+          created_at: '2025-01-02T00:00:00.000Z',
+        };
+      },
+    },
+  });
+
+  await service.processCallback({ sessionId: 'sess-sales-cumulative', serviceCode: '*123#', phoneNumber: '+254700000001', text: '4' });
+  await service.processCallback({ sessionId: 'sess-sales-cumulative', serviceCode: '*123#', phoneNumber: '+254700000001', text: '4*450000' });
+
+  const response = await service.processCallback({
+    sessionId: 'sess-sales-cumulative',
+    serviceCode: '*123#',
+    phoneNumber: '+254700000001',
+    text: '4*450000*1',
+  });
+
+  assert.equal(recordedAmount, 450000);
+  assert.match(response, /Sales report recorded/i);
+});
+
+test('report sales cancellation uses the final cumulative input segment', async () => {
+  const service = makeService();
+  await service.processCallback({ sessionId: 'sess-sales-cancel-cumulative', serviceCode: '*123#', phoneNumber: '+254700000001', text: '4' });
+  await service.processCallback({ sessionId: 'sess-sales-cancel-cumulative', serviceCode: '*123#', phoneNumber: '+254700000001', text: '4*450000' });
+
+  const response = await service.processCallback({
+    sessionId: 'sess-sales-cancel-cumulative',
+    serviceCode: '*123#',
+    phoneNumber: '+254700000001',
+    text: '4*450000*2',
+  });
+
+  assert.match(response, /Sales report cancelled/i);
 });
 
 test('invalid sales amount is rejected', async () => {
@@ -436,6 +483,23 @@ test('session continuation works across a multi-step order flow', async () => {
   assert.match(first, /Select product/i);
   assert.match(second, /Enter quantity/i);
   assert.match(third, /Order:/i);
+});
+
+test('place order preserves cumulative AT-style input across all steps', async () => {
+  const service = makeService();
+  await service.processCallback({ sessionId: 'sess-cumulative-order', serviceCode: '*123#', phoneNumber: '+254700000001', text: '1' });
+  await service.processCallback({ sessionId: 'sess-cumulative-order', serviceCode: '*123#', phoneNumber: '+254700000001', text: '1*1' });
+  await service.processCallback({ sessionId: 'sess-cumulative-order', serviceCode: '*123#', phoneNumber: '+254700000001', text: '1*1*20' });
+
+  const response = await service.processCallback({
+    sessionId: 'sess-cumulative-order',
+    serviceCode: '*123#',
+    phoneNumber: '+254700000001',
+    text: '1*1*20*1',
+  });
+
+  assert.match(response, /Order #FL-/i);
+  assert.match(response, /Status: Pending/i);
 });
 
 test('session termination handles unexpected invalid input safely', async () => {
