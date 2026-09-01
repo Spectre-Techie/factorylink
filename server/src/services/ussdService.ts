@@ -359,7 +359,8 @@ export class UssdService {
               : '\nYour airtime reward is pending processing.';
           }
         } catch {
-          response += '\nYour airtime reward is pending processing.';
+          this.sessions.delete(session.sessionId);
+          return response;
         }
       }
       this.sessions.delete(session.sessionId);
