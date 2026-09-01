@@ -27,7 +27,7 @@ services:
       - key: VOICE_CALLBACK_URL
         sync: false
       - key: CORS_ORIGIN
-        sync: false
+        value: https://factorylink-web.onrender.com
 
   - type: web
     name: factorylink-web
