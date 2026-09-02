@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { InventoryService } from './inventoryService.js';
+import { createInventoryRepository } from './inventoryRepository.js';
 
 function createService(overrides: Partial<Record<string, unknown>> = {}) {
   const repository = {
@@ -58,9 +59,26 @@ test('inventory item creation validates required fields', async () => {
   const service = createService();
 
   await assert.rejects(
-    () => service.createInventoryItem({ organization_id: 'org-1', sku: '', name: '', quantity_available: -1, reorder_threshold: -1, unit: '' }),
+    () => service.createInventoryItem({ organization_id: 'org-1', sku: '', name: '', quantity_available: -1, reorder_threshold: -1, unit: '' }, 'org-1'),
     /requires|required/i,
   );
+});
+
+test('inventory repository scopes list and detail reads by organization', async () => {
+  const repository = createInventoryRepository();
+
+  assert.deepEqual((await repository.listInventoryItems('org-demo')).map((item) => item.organization_id), ['org-demo']);
+  assert.equal(await repository.getInventoryItemById('inv-demo-1', 'other-org'), null);
+  assert.deepEqual((await repository.listContacts('org-demo')).map((contact) => contact.organization_id), ['org-demo']);
+  assert.deepEqual(await repository.listInventoryItems('other-org'), []);
+});
+
+test('inventory repository scopes alerts and audit events by organization', async () => {
+  const repository = createInventoryRepository();
+
+  assert.deepEqual(await repository.listAlerts('org-demo'), []);
+  assert.equal(await repository.getRecentAlert('inv-demo-1', 'other-org'), null);
+  assert.deepEqual(await repository.listAuditEventsByItemId('inv-demo-1', 'other-org'), []);
 });
 
 test('low-stock detection uses the reorder threshold as the trigger boundary', () => {
@@ -116,7 +134,7 @@ test('triggering alerts skips duplicate messages within the cool-down window', a
   };
 
   const service = new InventoryService(repository as never, provider as never);
-  const result = await service.triggerLowStockAlerts();
+  const result = await service.triggerLowStockAlerts('org-1');
 
   assert.equal(sendCalls, 0);
   assert.equal(result.processed, 0);
@@ -192,7 +210,7 @@ test('quantity update below threshold automatically triggers the low-stock workf
   };
 
   const service = new InventoryService(repository as never, provider as never);
-  const item = await service.updateInventoryQuantity('item-3', 15);
+  const item = await service.updateInventoryQuantity('item-3', 15, 'org-1');
 
   assert.equal(item.quantity_available, 15);
   assert.equal(smsCalls, 1);
@@ -267,7 +285,7 @@ test('quantity update above threshold does not trigger an alert', async () => {
   };
 
   const service = new InventoryService(repository as never, provider as never);
-  await service.updateInventoryQuantity('item-4', 25);
+  await service.updateInventoryQuantity('item-4', 25, 'org-1');
 
   assert.equal(smsCalls, 0);
 });
@@ -356,7 +374,7 @@ test('continuously low stock does not generate duplicate alerts within the suppr
   };
 
   const service = new InventoryService(repository as never, provider as never);
-  const result = await service.triggerLowStockAlerts();
+  const result = await service.triggerLowStockAlerts('org-1');
 
   assert.equal(result.processed, 0);
   assert.equal(result.skipped, 1);
@@ -444,7 +462,7 @@ test('recovery above threshold followed by another drop below threshold generate
   };
 
   const service = new InventoryService(repository as never, provider as never);
-  const result = await service.triggerLowStockAlerts();
+  const result = await service.triggerLowStockAlerts('org-1');
 
   assert.equal(result.processed, 1);
   assert.equal(result.skipped, 0);
@@ -454,14 +472,14 @@ test('recovery above threshold followed by another drop below threshold generate
 test('invalid quantity is rejected', async () => {
   const service = createService();
 
-  await assert.rejects(() => service.updateInventoryQuantity('item-1', -1), /non-negative/i);
+  await assert.rejects(() => service.updateInventoryQuantity('item-1', -1, 'org-1'), /non-negative/i);
 });
 
 test('invalid threshold is rejected', async () => {
   const service = createService();
 
   await assert.rejects(
-    () => service.createInventoryItem({ organization_id: 'org-1', sku: 'RING-09', name: 'Ring', quantity_available: 10, reorder_threshold: -1, unit: 'pcs' }),
+    () => service.createInventoryItem({ organization_id: 'org-1', sku: 'RING-09', name: 'Ring', quantity_available: 10, reorder_threshold: -1, unit: 'pcs' }, 'org-1'),
     /reorder_threshold/i,
   );
 });
@@ -515,7 +533,7 @@ test('provider failures are recorded as failed alert events without crashing the
   };
 
   const service = new InventoryService(repository as never, provider as never);
-  const result = await service.triggerLowStockAlerts();
+  const result = await service.triggerLowStockAlerts('org-1');
 
   assert.equal(result.processed, 0);
   assert.equal(result.failed, 1);

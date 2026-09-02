@@ -139,7 +139,7 @@ export default function HomePage() {
   }, []);
 
   const filteredWorkOrders = useMemo(() => filterVisibleWorkOrders(workOrders, filters), [workOrders, filters]);
-  const assignees = useMemo(() => [...new Set(workOrders.map((item) => item.assigned_to_user_id).filter(Boolean))] as string[], [workOrders]);
+  const assignees = useMemo(() => organizationTechnicians.map((person) => ({ id: person.id, name: person.name })), [organizationTechnicians]);
   const resolveAssigneeLabel = (assigneeId: string | null | undefined): string => {
     if (!assigneeId) return 'Unassigned';
     const technician = organizationTechnicians.find((person) => person.id === assigneeId);
@@ -419,7 +419,7 @@ export default function HomePage() {
             </div>
             {rewards.length === 0 ? <p className="px-5 py-8 text-center text-sm text-slate-500">No distributor rewards yet.</p> : (
               <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Distributor</th><th className="px-5 py-3">Sales amount</th><th className="px-5 py-3">Reward</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Created</th></tr></thead><tbody className="divide-y divide-slate-100">{rewards.map((reward) => (
-                <tr key={reward.id} className="text-slate-700"><td className="px-5 py-4 font-medium text-slate-900">{reward.distributor_name ?? reward.distributor_id}</td><td className="px-5 py-4">{reward.currency} {reward.sales_amount ?? '—'}</td><td className="px-5 py-4">{reward.currency} {reward.amount}</td><td className="px-5 py-4 capitalize">{reward.status}</td><td className="px-5 py-4">{formatDate(reward.created_at)}</td></tr>
+                <tr key={reward.id} className="text-slate-700"><td className="px-5 py-4 font-medium text-slate-900">{reward.distributor_name ?? 'Unknown distributor'}</td><td className="px-5 py-4">{reward.currency} {reward.sales_amount ?? '—'}</td><td className="px-5 py-4">{reward.currency} {reward.amount}</td><td className="px-5 py-4 capitalize">{reward.status}</td><td className="px-5 py-4">{formatDate(reward.created_at)}</td></tr>
               ))}</tbody></table></div>
             )}
           </section>
@@ -434,7 +434,7 @@ export default function HomePage() {
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <label className="text-sm font-medium text-slate-700">Status<select className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2" value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="">All statuses</option><option value="pending">Pending</option><option value="assigned">Assigned</option><option value="in_progress">In progress</option><option value="completed">Completed</option></select></label>
               <label className="text-sm font-medium text-slate-700">Priority<select className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2" value={filters.priority} onChange={(event) => setFilters({ ...filters, priority: event.target.value })}><option value="">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
-              <label className="text-sm font-medium text-slate-700">Assignee<select className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2" value={filters.assignee} onChange={(event) => setFilters({ ...filters, assignee: event.target.value })}><option value="">All assignees</option>{assignees.map((assignee) => <option key={assignee} value={assignee}>{assignee}</option>)}</select></label>
+              <label className="text-sm font-medium text-slate-700">Assignee<select className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2" value={filters.assignee} onChange={(event) => setFilters({ ...filters, assignee: event.target.value })}><option value="">All assignees</option>{assignees.map((assignee) => <option key={assignee.id} value={assignee.id}>{assignee.name}</option>)}</select></label>
             </div>
           </div>
           {filteredWorkOrders.length === 0 ? <p className="px-5 py-12 text-center text-sm text-slate-500">No work orders found.</p> : (

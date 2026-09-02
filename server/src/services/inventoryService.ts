@@ -28,22 +28,22 @@ export class InventoryService {
     return Number(item.quantity_available) <= Number(item.reorder_threshold);
   }
 
-  async listInventoryItems(): Promise<InventoryItem[]> {
-    return this.repository.listInventoryItems();
+  async listInventoryItems(organizationId: string): Promise<InventoryItem[]> {
+    return this.repository.listInventoryItems(organizationId);
   }
 
-  async getInventoryItemById(id: string): Promise<InventoryItem | null> {
-    return this.repository.getInventoryItemById(id);
+  async getInventoryItemById(id: string, organizationId: string): Promise<InventoryItem | null> {
+    return this.repository.getInventoryItemById(id, organizationId);
   }
 
-  async createInventoryItem(input: InventoryItemInput): Promise<InventoryItem> {
-    const organizationId = input.organization_id?.trim();
+  async createInventoryItem(input: InventoryItemInput, organizationId: string): Promise<InventoryItem> {
+    const scopedOrganizationId = organizationId.trim();
     const sku = input.sku?.trim();
     const name = input.name?.trim();
     const unit = input.unit?.trim();
 
-    if (!organizationId || !sku || !name || !unit) {
-      throw new Error('Inventory item requires organization_id, sku, name, and unit.');
+    if (!scopedOrganizationId || !sku || !name || !unit) {
+      throw new Error('Inventory item requires sku, name, and unit.');
     }
 
     if (!Number.isFinite(input.quantity_available) || Number(input.quantity_available) < 0) {
@@ -56,7 +56,7 @@ export class InventoryService {
 
     return this.repository.createInventoryItem({
       ...input,
-      organization_id: organizationId,
+      organization_id: scopedOrganizationId,
       sku,
       name,
       unit,
@@ -64,7 +64,7 @@ export class InventoryService {
     });
   }
 
-  async updateInventoryQuantity(id: string, quantity: number): Promise<InventoryItem> {
+  async updateInventoryQuantity(id: string, quantity: number, organizationId: string): Promise<InventoryItem> {
     if (!id || !id.trim()) {
       throw new Error('Inventory item id is required.');
     }
@@ -73,8 +73,8 @@ export class InventoryService {
       throw new Error('Inventory quantity must be a non-negative number.');
     }
 
-    const currentItem = await this.repository.getInventoryItemById(id);
-    const updatedItem = await this.repository.updateInventoryQuantity(id, quantity);
+    const currentItem = await this.repository.getInventoryItemById(id, organizationId);
+    const updatedItem = await this.repository.updateInventoryQuantity(id, quantity, organizationId);
     const nextStatus = this.resolveStatus(updatedItem.quantity_available, updatedItem.reorder_threshold);
 
     if (currentItem && currentItem.status !== nextStatus) {
@@ -93,7 +93,7 @@ export class InventoryService {
     }
 
     if (nextStatus === 'low_stock') {
-      const itemResult = await this.processLowStockItem(updatedItem);
+      const itemResult = await this.processLowStockItem(updatedItem, organizationId);
       if (itemResult.processed > 0 || itemResult.failed > 0 || itemResult.skipped > 0) {
         return updatedItem;
       }
@@ -102,17 +102,17 @@ export class InventoryService {
     return updatedItem;
   }
 
-  async listContacts(): Promise<InventoryContact[]> {
-    return this.repository.listContacts();
+  async listContacts(organizationId: string): Promise<InventoryContact[]> {
+    return this.repository.listContacts(organizationId);
   }
 
-  async createContact(input: InventoryContactInput): Promise<InventoryContact> {
-    const organizationId = input.organization_id?.trim();
+  async createContact(input: InventoryContactInput, organizationId: string): Promise<InventoryContact> {
+    const scopedOrganizationId = organizationId.trim();
     const name = input.name?.trim();
     const phoneNumber = input.phone_number?.trim();
 
-    if (!organizationId || !name || !phoneNumber) {
-      throw new Error('Contact requires organization_id, name, and phone_number.');
+    if (!scopedOrganizationId || !name || !phoneNumber) {
+      throw new Error('Contact requires name and phone_number.');
     }
 
     if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber.replace(/\s+/g, ''))) {
@@ -121,7 +121,7 @@ export class InventoryService {
 
     return this.repository.createContact({
       ...input,
-      organization_id: organizationId,
+      organization_id: scopedOrganizationId,
       name,
       phone_number: phoneNumber,
       channel: input.channel ?? 'sms',
@@ -129,16 +129,16 @@ export class InventoryService {
     });
   }
 
-  async listAlerts(): Promise<InventoryAlert[]> {
-    return this.repository.listAlerts();
+  async listAlerts(organizationId: string): Promise<InventoryAlert[]> {
+    return this.repository.listAlerts(organizationId);
   }
 
   private resolveStatus(quantityAvailable: number, reorderThreshold: number): 'active' | 'low_stock' {
     return Number(quantityAvailable) <= Number(reorderThreshold) ? 'low_stock' : 'active';
   }
 
-  private async getLastStatusTransition(itemId: string, targetStatus: 'low_stock' | 'active'): Promise<number> {
-    const events = await this.repository.listAuditEventsByItemId(itemId);
+  private async getLastStatusTransition(itemId: string, targetStatus: 'low_stock' | 'active', organizationId: string): Promise<number> {
+    const events = await this.repository.listAuditEventsByItemId(itemId, organizationId);
     const transitionEvent = events
       .filter((event) => event.event_type === 'inventory_status_changed')
       .map((event) => ({
@@ -151,8 +151,8 @@ export class InventoryService {
     return transitionEvent?.created_at ?? 0;
   }
 
-  async evaluateLowStockForItem(itemId: string): Promise<{ processed: number; failed: number; skipped: number; alerts: InventoryAlert[] }> {
-    const item = await this.repository.getInventoryItemById(itemId);
+  async evaluateLowStockForItem(itemId: string, organizationId: string): Promise<{ processed: number; failed: number; skipped: number; alerts: InventoryAlert[] }> {
+    const item = await this.repository.getInventoryItemById(itemId, organizationId);
 
     if (!item) {
       throw new Error('Inventory item not found.');
@@ -162,11 +162,11 @@ export class InventoryService {
       return { processed: 0, failed: 0, skipped: 0, alerts: [] };
     }
 
-    return this.processLowStockItem(item);
+    return this.processLowStockItem(item, organizationId);
   }
 
-  async triggerLowStockAlerts(): Promise<{ processed: number; failed: number; skipped: number; alerts: InventoryAlert[] }> {
-    const items = await this.repository.listInventoryItems();
+  async triggerLowStockAlerts(organizationId: string): Promise<{ processed: number; failed: number; skipped: number; alerts: InventoryAlert[] }> {
+    const items = await this.repository.listInventoryItems(organizationId);
     const result = {
       processed: 0,
       failed: 0,
@@ -179,7 +179,7 @@ export class InventoryService {
         continue;
       }
 
-      const itemResult = await this.processLowStockItem(item);
+      const itemResult = await this.processLowStockItem(item, organizationId);
       result.processed += itemResult.processed;
       result.failed += itemResult.failed;
       result.skipped += itemResult.skipped;
@@ -189,11 +189,11 @@ export class InventoryService {
     return result;
   }
 
-  private async processLowStockItem(item: InventoryItem): Promise<{ processed: number; failed: number; skipped: number; alerts: InventoryAlert[] }> {
-    const recentAlert = await this.repository.getRecentAlert(item.id);
+  private async processLowStockItem(item: InventoryItem, organizationId: string): Promise<{ processed: number; failed: number; skipped: number; alerts: InventoryAlert[] }> {
+    const recentAlert = await this.repository.getRecentAlert(item.id, organizationId);
     const recentAlertTime = recentAlert ? new Date(recentAlert.created_at).getTime() : 0;
-    const lastLowStockTransition = await this.getLastStatusTransition(item.id, 'low_stock');
-    const lastActiveTransition = await this.getLastStatusTransition(item.id, 'active');
+    const lastLowStockTransition = await this.getLastStatusTransition(item.id, 'low_stock', organizationId);
+    const lastActiveTransition = await this.getLastStatusTransition(item.id, 'active', organizationId);
 
     const shouldSkipDuplicate = Boolean(
       recentAlert && (
@@ -223,7 +223,7 @@ export class InventoryService {
       return { processed: 0, failed: 0, skipped: 1, alerts: [] };
     }
 
-    const contacts = await this.repository.listContacts();
+    const contacts = await this.repository.listContacts(organizationId);
     const activeContacts = contacts.filter(
       (contact) => contact.organization_id === item.organization_id && contact.status === 'active',
     );

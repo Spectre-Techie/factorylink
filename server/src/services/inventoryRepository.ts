@@ -84,16 +84,16 @@ export interface InventoryAuditEventInput {
 }
 
 export interface InventoryRepository {
-  listInventoryItems(): Promise<InventoryItem[]>;
-  getInventoryItemById(id: string): Promise<InventoryItem | null>;
+  listInventoryItems(organizationId: string): Promise<InventoryItem[]>;
+  getInventoryItemById(id: string, organizationId: string): Promise<InventoryItem | null>;
   createInventoryItem(input: InventoryItemInput): Promise<InventoryItem>;
-  updateInventoryQuantity(id: string, quantity: number): Promise<InventoryItem>;
-  listContacts(): Promise<InventoryContact[]>;
+  updateInventoryQuantity(id: string, quantity: number, organizationId: string): Promise<InventoryItem>;
+  listContacts(organizationId: string): Promise<InventoryContact[]>;
   createContact(input: InventoryContactInput): Promise<InventoryContact>;
-  listAlerts(): Promise<InventoryAlert[]>;
-  getRecentAlert(inventoryItemId: string): Promise<InventoryAlert | null>;
+  listAlerts(organizationId: string): Promise<InventoryAlert[]>;
+  getRecentAlert(inventoryItemId: string, organizationId: string): Promise<InventoryAlert | null>;
   createAlert(input: InventoryAlertInput): Promise<InventoryAlert>;
-  listAuditEventsByItemId(itemId: string): Promise<InventoryAuditEvent[]>;
+  listAuditEventsByItemId(itemId: string, organizationId: string): Promise<InventoryAuditEvent[]>;
   createAuditEvent(input: InventoryAuditEventInput): Promise<InventoryAuditEvent>;
 }
 
@@ -128,12 +128,12 @@ class InMemoryInventoryRepository implements InventoryRepository {
 
   private auditEvents: InventoryAuditEvent[] = [];
 
-  async listInventoryItems(): Promise<InventoryItem[]> {
-    return [...this.inventoryItems];
+  async listInventoryItems(organizationId: string): Promise<InventoryItem[]> {
+    return this.inventoryItems.filter((item) => item.organization_id === organizationId);
   }
 
-  async getInventoryItemById(id: string): Promise<InventoryItem | null> {
-    return this.inventoryItems.find((item) => item.id === id) ?? null;
+  async getInventoryItemById(id: string, organizationId: string): Promise<InventoryItem | null> {
+    return this.inventoryItems.find((item) => item.id === id && item.organization_id === organizationId) ?? null;
   }
 
   async createInventoryItem(input: InventoryItemInput): Promise<InventoryItem> {
@@ -153,8 +153,8 @@ class InMemoryInventoryRepository implements InventoryRepository {
     return item;
   }
 
-  async updateInventoryQuantity(id: string, quantity: number): Promise<InventoryItem> {
-    const item = this.inventoryItems.find((entry) => entry.id === id);
+  async updateInventoryQuantity(id: string, quantity: number, organizationId: string): Promise<InventoryItem> {
+    const item = this.inventoryItems.find((entry) => entry.id === id && entry.organization_id === organizationId);
 
     if (!item) {
       throw new Error(`Inventory item not found: ${id}`);
@@ -167,13 +167,13 @@ class InMemoryInventoryRepository implements InventoryRepository {
     return item;
   }
 
-  async listAuditEventsByItemId(itemId: string): Promise<InventoryAuditEvent[]> {
-    return [...this.auditEvents].filter((event) => event.inventory_item_id === itemId)
+  async listAuditEventsByItemId(itemId: string, organizationId: string): Promise<InventoryAuditEvent[]> {
+    return [...this.auditEvents].filter((event) => event.inventory_item_id === itemId && event.organization_id === organizationId)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  async listContacts(): Promise<InventoryContact[]> {
-    return [...this.contacts];
+  async listContacts(organizationId: string): Promise<InventoryContact[]> {
+    return this.contacts.filter((contact) => contact.organization_id === organizationId);
   }
 
   async createContact(input: InventoryContactInput): Promise<InventoryContact> {
@@ -191,12 +191,13 @@ class InMemoryInventoryRepository implements InventoryRepository {
     return contact;
   }
 
-  async listAlerts(): Promise<InventoryAlert[]> {
-    return [...this.alerts].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  async listAlerts(organizationId: string): Promise<InventoryAlert[]> {
+    return this.alerts.filter((alert) => alert.organization_id === organizationId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  async getRecentAlert(inventoryItemId: string): Promise<InventoryAlert | null> {
-    const matches = this.alerts.filter((item) => item.inventory_item_id === inventoryItemId);
+  async getRecentAlert(inventoryItemId: string, organizationId: string): Promise<InventoryAlert | null> {
+    const matches = this.alerts.filter((item) => item.inventory_item_id === inventoryItemId && item.organization_id === organizationId);
     return matches.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
   }
 
@@ -245,13 +246,13 @@ export function createInventoryRepository(): InventoryRepository {
     });
 
     return {
-      async listInventoryItems() {
-        const { data, error } = await supabase.from('inventory_items').select('*');
+      async listInventoryItems(organizationId) {
+        const { data, error } = await supabase.from('inventory_items').select('*').eq('organization_id', organizationId);
         if (error) throw new Error(`Failed to list inventory items: ${error.message}`);
         return (data ?? []) as InventoryItem[];
       },
-      async getInventoryItemById(id: string) {
-        const { data, error } = await supabase.from('inventory_items').select('*').eq('id', id).maybeSingle();
+      async getInventoryItemById(id: string, organizationId: string) {
+        const { data, error } = await supabase.from('inventory_items').select('*').eq('id', id).eq('organization_id', organizationId).maybeSingle();
         if (error) throw new Error(`Failed to fetch inventory item: ${error.message}`);
         return (data as InventoryItem | null) ?? null;
       },
@@ -260,8 +261,8 @@ export function createInventoryRepository(): InventoryRepository {
         if (error) throw new Error(`Failed to create inventory item: ${error.message}`);
         return data as InventoryItem;
       },
-      async updateInventoryQuantity(id: string, quantity: number) {
-        const currentItemResult = await supabase.from('inventory_items').select('*').eq('id', id).maybeSingle();
+      async updateInventoryQuantity(id: string, quantity: number, organizationId: string) {
+        const currentItemResult = await supabase.from('inventory_items').select('*').eq('id', id).eq('organization_id', organizationId).maybeSingle();
         if (currentItemResult.error) throw new Error(`Failed to fetch inventory item: ${currentItemResult.error.message}`);
 
         const currentItem = currentItemResult.data as InventoryItem | null;
@@ -272,13 +273,13 @@ export function createInventoryRepository(): InventoryRepository {
           quantity_available: quantity,
           status: nextStatus,
           updated_at: new Date().toISOString(),
-        }).eq('id', id).select().single();
+        }).eq('id', id).eq('organization_id', organizationId).select().single();
 
         if (error) throw new Error(`Failed to update inventory quantity: ${error.message}`);
         return data as InventoryItem;
       },
-      async listContacts() {
-        const { data, error } = await supabase.from('contacts').select('*');
+      async listContacts(organizationId: string) {
+        const { data, error } = await supabase.from('contacts').select('*').eq('organization_id', organizationId);
         if (error) throw new Error(`Failed to list contacts: ${error.message}`);
         return (data ?? []) as InventoryContact[];
       },
@@ -287,13 +288,13 @@ export function createInventoryRepository(): InventoryRepository {
         if (error) throw new Error(`Failed to create contact: ${error.message}`);
         return data as InventoryContact;
       },
-      async listAlerts() {
-        const { data, error } = await supabase.from('inventory_alerts').select('*').order('created_at', { ascending: false });
+      async listAlerts(organizationId: string) {
+        const { data, error } = await supabase.from('inventory_alerts').select('*').eq('organization_id', organizationId).order('created_at', { ascending: false });
         if (error) throw new Error(`Failed to list alerts: ${error.message}`);
         return (data ?? []) as InventoryAlert[];
       },
-      async getRecentAlert(inventoryItemId: string) {
-        const { data, error } = await supabase.from('inventory_alerts').select('*').eq('inventory_item_id', inventoryItemId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      async getRecentAlert(inventoryItemId: string, organizationId: string) {
+        const { data, error } = await supabase.from('inventory_alerts').select('*').eq('inventory_item_id', inventoryItemId).eq('organization_id', organizationId).order('created_at', { ascending: false }).limit(1).maybeSingle();
         if (error) throw new Error(`Failed to fetch alert: ${error.message}`);
         return (data as InventoryAlert | null) ?? null;
       },
@@ -302,8 +303,8 @@ export function createInventoryRepository(): InventoryRepository {
         if (error) throw new Error(`Failed to create alert: ${error.message}`);
         return data as InventoryAlert;
       },
-      async listAuditEventsByItemId(itemId: string) {
-        const { data, error } = await supabase.from('inventory_audit_events').select('*').eq('inventory_item_id', itemId).order('created_at', { ascending: false });
+      async listAuditEventsByItemId(itemId: string, organizationId: string) {
+        const { data, error } = await supabase.from('inventory_audit_events').select('*').eq('inventory_item_id', itemId).eq('organization_id', organizationId).order('created_at', { ascending: false });
         if (error) throw new Error(`Failed to list audit events: ${error.message}`);
         return (data ?? []) as InventoryAuditEvent[];
       },

@@ -279,8 +279,8 @@ app.get('/api/dashboard/insights', requireAuth, async (req: Request, res: Respon
   const insights = await getOperationalInsights(user, {
     listWorkOrders: () => workOrderRepository.listWorkOrders(),
     listWorkOrderEvents: (workOrderId) => workOrderRepository.listWorkOrderEvents(workOrderId),
-    listInventoryItems: () => inventoryRepository.listInventoryItems(),
-    listInventoryAlerts: () => inventoryRepository.listAlerts(),
+    listInventoryItems: () => inventoryRepository.listInventoryItems(user.organization_id),
+    listInventoryAlerts: () => inventoryRepository.listAlerts(user.organization_id),
     listSalesReportsForOrganization: (organizationId) => ussdRepository.listSalesReportsForOrganization(organizationId),
     listRewardsForOrganization: (organizationId) => createAirtimeRewardRepository().listRewardsForOrganization(organizationId),
   });
@@ -392,24 +392,28 @@ app.post('/api/africastalking/voice', async (req: Request, res: Response) => {
   }
 });
 
-app.get('/api/inventory', async (_req: Request, res: Response) => {
-  const items = await inventoryService.listInventoryItems();
+app.get('/api/inventory', requireAuth, async (req: Request, res: Response) => {
+  const items = await inventoryService.listInventoryItems(req.user!.organization_id);
   res.status(200).json({ ok: true, data: items });
 });
 
-app.post('/api/inventory/alerts/trigger', async (_req: Request, res: Response) => {
-  const summary = await inventoryService.triggerLowStockAlerts();
+app.post('/api/inventory/alerts/trigger', requireAuth, async (req: Request, res: Response) => {
+  if (!['manager', 'operations'].includes(req.user!.role)) {
+    res.status(403).json({ ok: false, message: 'Inventory mutation access denied.' });
+    return;
+  }
+  const summary = await inventoryService.triggerLowStockAlerts(req.user!.organization_id);
   res.status(200).json({ ok: true, data: summary });
 });
 
-app.get('/api/inventory/alerts', async (_req: Request, res: Response) => {
-  const alerts = await inventoryService.listAlerts();
+app.get('/api/inventory/alerts', requireAuth, async (req: Request, res: Response) => {
+  const alerts = await inventoryService.listAlerts(req.user!.organization_id);
   res.status(200).json({ ok: true, data: alerts });
 });
 
-app.get('/api/inventory/:id', async (req: Request, res: Response) => {
+app.get('/api/inventory/:id', requireAuth, async (req: Request, res: Response) => {
   const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const item = await inventoryService.getInventoryItemById(itemId);
+  const item = await inventoryService.getInventoryItemById(itemId, req.user!.organization_id);
 
   if (!item) {
     res.status(404).json({ ok: false, message: 'Inventory item not found.' });
@@ -419,9 +423,13 @@ app.get('/api/inventory/:id', async (req: Request, res: Response) => {
   res.status(200).json({ ok: true, data: item });
 });
 
-app.post('/api/inventory', async (req: Request, res: Response) => {
+app.post('/api/inventory', requireAuth, async (req: Request, res: Response) => {
+  if (!['manager', 'operations'].includes(req.user!.role)) {
+    res.status(403).json({ ok: false, message: 'Inventory mutation access denied.' });
+    return;
+  }
   try {
-    const item = await inventoryService.createInventoryItem(req.body ?? {});
+    const item = await inventoryService.createInventoryItem(req.body ?? {}, req.user!.organization_id);
     res.status(201).json({ ok: true, data: item });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to create inventory item.';
@@ -429,11 +437,15 @@ app.post('/api/inventory', async (req: Request, res: Response) => {
   }
 });
 
-app.patch('/api/inventory/:id/quantity', async (req: Request, res: Response) => {
+app.patch('/api/inventory/:id/quantity', requireAuth, async (req: Request, res: Response) => {
+  if (!['manager', 'operations'].includes(req.user!.role)) {
+    res.status(403).json({ ok: false, message: 'Inventory mutation access denied.' });
+    return;
+  }
   try {
     const itemId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const quantity = Number(req.body?.quantity ?? req.body?.quantity_available ?? 0);
-    const item = await inventoryService.updateInventoryQuantity(itemId, quantity);
+    const item = await inventoryService.updateInventoryQuantity(itemId, quantity, req.user!.organization_id);
     res.status(200).json({ ok: true, data: item });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to update quantity.';
@@ -441,14 +453,18 @@ app.patch('/api/inventory/:id/quantity', async (req: Request, res: Response) => 
   }
 });
 
-app.get('/api/contacts', async (_req: Request, res: Response) => {
-  const contacts = await inventoryService.listContacts();
+app.get('/api/contacts', requireAuth, async (req: Request, res: Response) => {
+  const contacts = await inventoryService.listContacts(req.user!.organization_id);
   res.status(200).json({ ok: true, data: contacts });
 });
 
-app.post('/api/contacts', async (req: Request, res: Response) => {
+app.post('/api/contacts', requireAuth, async (req: Request, res: Response) => {
+  if (!['manager', 'operations'].includes(req.user!.role)) {
+    res.status(403).json({ ok: false, message: 'Inventory mutation access denied.' });
+    return;
+  }
   try {
-    const contact = await inventoryService.createContact(req.body ?? {});
+    const contact = await inventoryService.createContact(req.body ?? {}, req.user!.organization_id);
     res.status(201).json({ ok: true, data: contact });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to create contact.';
