@@ -20,6 +20,7 @@ const TOKEN_KEY = 'factorylink.auth-token';
 type ApiResponse<T> = { ok: boolean; data?: T; message?: string };
 type DashboardResponse = { summary: DashboardSummary; workOrders: DashboardWorkOrder[] };
 type OrganizationUser = { id: string; organization_id: string; name: string; email: string; role: 'manager' | 'operations' | 'technician' };
+type InventoryItem = { id: string; sku: string; name: string; quantity_available: number; reorder_threshold: number; unit: string; status: 'active' | 'low_stock' | 'archived'; updated_at: string };
 
 type WorkOrderCreateForm = {
   title: string;
@@ -77,7 +78,12 @@ export default function HomePage() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
   const [organizationTechnicians, setOrganizationTechnicians] = useState<OrganizationUser[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [filters, setFilters] = useState<WorkOrderFilters>(defaultFilters);
+  const [activeView, setActiveView] = useState<'overview' | 'work-orders' | 'inventory' | 'insights' | 'rewards'>('overview');
+  const [inventorySearch, setInventorySearch] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [createForm, setCreateForm] = useState<WorkOrderCreateForm>(defaultCreateForm);
@@ -97,11 +103,14 @@ export default function HomePage() {
 
   const loadDashboard = async (activeToken: string) => {
     const currentUser = await request<DashboardUser>('/api/auth/me', activeToken);
-    const [dashboard, visibleWorkOrders, technicians, visibleRewards] = await Promise.all([
+    setInventoryLoading(true);
+    setInventoryError(null);
+    const [dashboard, visibleWorkOrders, technicians, visibleRewards, visibleInventory] = await Promise.all([
       request<DashboardResponse>('/api/dashboard/summary', activeToken),
       request<DashboardWorkOrder[]>('/api/work-orders', activeToken),
       currentUser.role === 'technician' ? Promise.resolve([]) : request<OrganizationUser[]>(`/api/users?role=technician`, activeToken),
       currentUser.role === 'technician' ? Promise.resolve([]) : request<DashboardReward[]>('/api/distributor/rewards', activeToken),
+      request<InventoryItem[]>('/api/inventory', activeToken),
     ]);
 
     setToken(activeToken);
@@ -110,6 +119,8 @@ export default function HomePage() {
     setWorkOrders(visibleWorkOrders);
     setOrganizationTechnicians(technicians);
     setRewards(visibleRewards);
+    setInventory(visibleInventory);
+    setInventoryLoading(false);
     if (currentUser.role !== 'technician') {
       setInsightsLoading(true);
       setInsightsError(null);
@@ -133,12 +144,15 @@ export default function HomePage() {
     void loadDashboard(storedToken)
       .catch((loadError) => {
         if (loadError instanceof AuthenticationError) clearAuthentication();
+        setInventoryLoading(false);
+        setInventoryError('Inventory data is temporarily unavailable.');
         setError(loadError instanceof AuthenticationError ? 'Your session has expired. Please sign in again.' : 'Unable to load the dashboard.');
       })
       .finally(() => setLoading(false));
   }, []);
 
   const filteredWorkOrders = useMemo(() => filterVisibleWorkOrders(workOrders, filters), [workOrders, filters]);
+  const filteredInventory = useMemo(() => inventory.filter((item) => `${item.name} ${item.sku}`.toLowerCase().includes(inventorySearch.trim().toLowerCase())), [inventory, inventorySearch]);
   const assignees = useMemo(() => organizationTechnicians.map((person) => ({ id: person.id, name: person.name })), [organizationTechnicians]);
   const resolveAssigneeLabel = (assigneeId: string | null | undefined): string => {
     if (!assigneeId) return 'Unassigned';
@@ -287,7 +301,7 @@ export default function HomePage() {
         <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">FactoryLink</p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">FactoryLink Operations</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Use your operational account to access organization-scoped work orders.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Sign in to your organization-scoped operations control center.</p>
           <form className="mt-7 space-y-4" onSubmit={handleLogin}>
             <label className="block text-sm font-medium text-slate-700">Email
               <input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
@@ -306,27 +320,57 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+    <main className="min-h-screen bg-[#f4f7f8] text-slate-950">
+      <header className="border-b border-slate-800 bg-[#10252b] text-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-700">FactoryLink</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Operations Dashboard</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">FactoryLink</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight">Industrial Operations Platform</h1>
           </div>
-          <div className="flex items-center justify-between gap-4 sm:justify-end">
-            <div className="text-right text-sm">
-              <p className="font-semibold text-slate-900">{user.name}</p>
-              <p className="text-slate-500">{roleLabel(user.role)} · FactoryLink</p>
+          <div className="flex flex-col gap-4 lg:items-end">
+            <div className="flex max-w-full gap-1 overflow-x-auto pb-1" aria-label="Primary navigation">
+              {([['overview', 'Overview'], ['work-orders', 'Work Orders'], ['inventory', 'Inventory'], ['insights', 'Operational Insights'], ['rewards', 'Distributor Rewards']] as const)
+                .filter(([view]) => view === 'overview' || view === 'work-orders' || view === 'inventory' || user.role !== 'technician')
+                .map(([view, label]) => (
+                  <button key={view} type="button" onClick={() => setActiveView(view)} aria-current={activeView === view ? 'page' : undefined} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition ${activeView === view ? 'border-cyan-300 text-white' : 'border-transparent text-slate-300 hover:border-slate-500 hover:text-white'}`}>
+                    {label}
+                  </button>
+                ))}
             </div>
-            <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button" onClick={handleLogout}>Log out</button>
+            <div className="flex items-center justify-between gap-4 text-sm lg:justify-end">
+              <div className="text-right">
+                <p className="font-semibold">{user.name}</p>
+                <p className="text-slate-300">{roleLabel(user.role)}</p>
+              </div>
+              <button className="rounded-md border border-slate-500 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10" type="button" onClick={handleLogout}>Log out</button>
+            </div>
           </div>
         </div>
       </header>
 
       <section className="mx-auto max-w-7xl px-5 py-8">
-        {error && <p role="alert" className="mb-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-        {notice && <p className="mb-5 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</p>}
-        {user.role !== 'technician' && (
+        {error && <p role="alert" aria-live="assertive" className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
+        {notice && <p role="status" aria-live="polite" className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}
+        {activeView === 'overview' && (
+          <section aria-labelledby="overview-heading" className="mb-8">
+            <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div><p className="section-kicker">Operational status</p><h2 id="overview-heading" className="mt-1 text-3xl font-bold tracking-tight">What needs attention today?</h2></div>
+              <p className="max-w-md text-sm leading-6 text-slate-600">A focused view of work health, stock risk, and the actions your team can take next.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[['Work orders', summary.total, 'Total in your organization'], ['Pending', summary.pending, 'Waiting for action'], ['In progress', summary.in_progress, 'Currently being handled'], ['Completed', summary.completed, 'Closed successfully']].map(([label, value, detail]) => (
+                <article key={label} className="metric-panel"><p className="text-sm font-semibold text-slate-500">{label}</p><p className="mt-3 text-3xl font-bold text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></article>
+              ))}
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_1fr]">
+              <div className="surface-panel"><div className="flex items-center justify-between"><div><p className="section-kicker">Attention required</p><h3 className="mt-1 text-lg font-bold">Priority signals</h3></div><button type="button" onClick={() => setActiveView('insights')} className="text-sm font-bold text-cyan-800 hover:text-cyan-950">Open insights</button></div>
+                {insights?.attention?.length ? <ul className="mt-4 space-y-2">{insights.attention.slice(0, 4).map((item, index) => <li key={`${item.category}-${item.title}-${index}`} className="flex gap-3 border-t border-slate-200 py-3 text-sm"><span className={`status-badge ${item.priority === 'critical' ? 'status-critical' : item.priority === 'attention' ? 'status-attention' : 'status-healthy'}`}>{item.priority}</span><span><strong>{item.title}</strong><span className="block text-slate-600">{item.message}</span></span></li>)}</ul> : <p className="mt-4 rounded-md bg-emerald-50 px-3 py-3 text-sm text-emerald-800">No operational issues require attention.</p>}
+              </div>
+              <div className="surface-panel"><p className="section-kicker">Inventory risk</p><h3 className="mt-1 text-lg font-bold">Stock position</h3>{insights ? <div className="mt-4 grid grid-cols-3 gap-3"><div><p className="text-xs text-slate-500">Low stock</p><p className="mt-1 text-2xl font-bold text-amber-700">{insights.inventoryRisk.lowStockItems}</p></div><div><p className="text-xs text-slate-500">Critical</p><p className="mt-1 text-2xl font-bold text-red-700">{insights.inventoryRisk.criticalAlerts}</p></div><div><p className="text-xs text-slate-500">Failed alerts</p><p className="mt-1 text-2xl font-bold text-slate-900">{insights.inventoryRisk.failedAlerts}</p></div></div> : <p className="mt-4 text-sm text-slate-500">Insights are still loading.</p>}<button type="button" onClick={() => setActiveView('inventory')} className="mt-5 text-sm font-bold text-cyan-800 hover:text-cyan-950">Review inventory</button></div>
+            </div>
+          </section>
+        )}
+        {activeView === 'work-orders' && user.role !== 'technician' && (
           <form className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleCreateWorkOrder}>
             <div className="flex flex-col gap-3 md:flex-row md:items-end">
               <label className="flex-1 text-sm font-medium text-slate-700">Title
@@ -350,7 +394,7 @@ export default function HomePage() {
             </div>
           </form>
         )}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {activeView === 'overview' && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             ['Total work orders', summary.total, 'text-slate-950'],
             ['Pending', summary.pending, 'text-amber-700'],
@@ -362,14 +406,14 @@ export default function HomePage() {
               <p className={`mt-2 text-3xl font-bold ${color}`}>{value}</p>
             </article>
           ))}
-        </div>
+        </div>}
 
-        <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        {activeView === 'overview' && <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm font-medium text-slate-500">Priority breakdown</p>
           <div className="mt-2 flex gap-5 text-sm text-slate-700"><span>High <strong>{summary.byPriority.high}</strong></span><span>Medium <strong>{summary.byPriority.medium}</strong></span><span>Low <strong>{summary.byPriority.low}</strong></span></div>
-        </div>
+        </div>}
 
-        {user.role !== 'technician' && (
+        {activeView === 'insights' && user.role !== 'technician' && (
           <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -411,7 +455,7 @@ export default function HomePage() {
           </section>
         )}
 
-        {user.role !== 'technician' && (
+        {activeView === 'rewards' && user.role !== 'technician' && (
           <section className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 px-5 py-5">
               <h2 className="text-lg font-bold text-slate-950">Distributor Rewards</h2>
@@ -425,7 +469,7 @@ export default function HomePage() {
           </section>
         )}
 
-        <section className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
+        {activeView === 'work-orders' && <section className="mt-8 rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-5 py-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div><h2 className="text-lg font-bold text-slate-950">Work orders</h2><p className="text-sm text-slate-500">{user.role === 'technician' ? 'Only work orders assigned to you are shown.' : 'Showing work orders in your organization.'}</p></div>
@@ -444,8 +488,8 @@ export default function HomePage() {
               return (
                 <tr key={workOrder.id} className="align-top text-slate-700">
                   <td className="px-5 py-4 font-medium text-slate-900">{workOrder.title}</td>
-                  <td className="px-5 py-4 capitalize">{workOrder.priority}</td>
-                  <td className="px-5 py-4">{statusLabel(workOrder.status)}</td>
+                  <td className="px-5 py-4"><span className={`status-badge ${workOrder.priority === 'high' ? 'status-critical' : workOrder.priority === 'medium' ? 'status-attention' : 'status-neutral'}`}>{workOrder.priority}</span></td>
+                  <td className="px-5 py-4"><span className={`status-badge ${workOrder.status === 'completed' ? 'status-healthy' : workOrder.status === 'in_progress' ? 'status-attention' : 'status-neutral'}`}>{statusLabel(workOrder.status)}</span></td>
                   <td className="px-5 py-4">{resolveAssigneeLabel(workOrder.assigned_to_user_id)}</td>
                   <td className="px-5 py-4">{formatDate(workOrder.due_at)}</td>
                   <td className="px-5 py-4">{formatDate(workOrder.created_at)}</td>
@@ -486,7 +530,13 @@ export default function HomePage() {
               );
             })}</tbody></table></div>
           )}
-        </section>
+        </section>}
+        {activeView === 'inventory' && (
+          <section aria-labelledby="inventory-heading" className="surface-panel mt-8">
+            <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="section-kicker">Stock control</p><h2 id="inventory-heading" className="mt-1 text-2xl font-bold">Inventory</h2><p className="mt-1 text-sm text-slate-600">Organization-scoped stock levels and reorder signals.</p></div><label className="w-full text-sm font-semibold text-slate-700 sm:max-w-xs">Search inventory<input className="field-control mt-1.5" type="search" placeholder="Product or SKU" value={inventorySearch} onChange={(event) => setInventorySearch(event.target.value)} /></label></div>
+            {inventoryLoading ? <p className="py-12 text-center text-sm text-slate-500" role="status">Loading inventory...</p> : inventoryError ? <p className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">{inventoryError} Try refreshing your session.</p> : filteredInventory.length === 0 ? <p className="py-12 text-center text-sm text-slate-500">No inventory items match this search.</p> : <div className="mt-5 overflow-x-auto"><table className="data-table"><thead><tr><th>Product</th><th>SKU</th><th>Quantity</th><th>Reorder threshold</th><th>Stock state</th><th>Updated</th></tr></thead><tbody>{filteredInventory.map((item) => <tr key={item.id}><td className="font-semibold text-slate-950">{item.name}</td><td>{item.sku}</td><td>{item.quantity_available} {item.unit}</td><td>{item.reorder_threshold} {item.unit}</td><td><span className={`status-badge ${item.status === 'low_stock' ? 'status-attention' : item.status === 'archived' ? 'status-neutral' : 'status-healthy'}`}>{item.status === 'low_stock' ? 'Low stock' : item.status === 'archived' ? 'Archived' : 'In stock'}</span></td><td>{formatDate(item.updated_at)}</td></tr>)}</tbody></table></div>}
+          </section>
+        )}
       </section>
     </main>
   );
