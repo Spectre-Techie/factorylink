@@ -2,7 +2,7 @@
 
 ## 1. Integration goals
 
-Africa's Talking is the planned communication provider for FactoryLink's SMS, USSD, voice, and airtime capabilities. The integration must remain isolated behind a provider abstraction layer so that provider credentials and request logic can be added later without polluting core business flows.
+Africa's Talking is the communication provider for FactoryLink's SMS, USSD, voice, and airtime capabilities. The integration remains isolated behind a provider abstraction layer so provider credentials and request logic do not enter frontend code or core business flows.
 
 ## 2. Architectural approach
 
@@ -156,6 +156,31 @@ curl -X POST http://localhost:4000/dev/at/sandbox/sms-test \
 - No production or live Africa's Talking environment is used.
 - No database tables, frontend changes, or business-feature code are created here.
 
-## 8. Future implementation
+## 8. Phase 11 integration matrix
 
-This task does not include live business workflows, database persistence, or non-SMS functionality. It only establishes the first controlled sandbox integration test for the provider layer.
+This matrix separates repository behavior from provider-account and handset verification. `READY` means covered by implementation and repository tests; `PARTIAL` means the flow exists but external verification is still required; `MISSING` means evidence is not present.
+
+| Channel or capability | Status | Recorded behavior and remaining verification |
+|---|---|---|
+| SMS shortcode | MISSING | Shortcode `3979` is required for production configuration; no repository evidence confirms it is provisioned. |
+| SMS outbound | READY | Server-side provider adapter sends outbound notifications and the repository has service coverage. |
+| SMS inbound | READY | `POST /api/africastalking/sms` accepts AT callback fields, persists inbound messages, and deduplicates provider message IDs. |
+| SMS Sandbox verification | PARTIAL | The development-only `/dev/at/sandbox/sms-test` endpoint and manual procedure are documented; a live provider send is still manual. |
+| USSD ordering | READY | Session flow supports order placement with input validation. |
+| USSD stock | READY | Session menu supports Check Stock. |
+| USSD orders | READY | Session menu supports My Orders. |
+| USSD sales reporting | READY | Session menu supports Report Sales and the airtime reward flow. |
+| USSD help | READY | Session menu supports Help. |
+| USSD validation/session behavior | READY | Invalid input and multi-step session behavior are covered by service tests. |
+| Voice callback | READY | `POST /api/africastalking/voice` accepts callback payload variants and returns XML. |
+| Voice technician call flow | READY | Authenticated work-order call initiation uses the provider adapter. |
+| Voice callback digit handling | READY | Callback digit/DTMF values are normalized into the voice service flow. |
+| Voice live handset limitation | BLOCKED | Live handset verification remains unavailable until a provisioned AT voice number and reachable callback are supplied. |
+| Airtime reward tiers | READY | Sales-report eligibility and reward tiers are implemented and tested. |
+| Airtime provider request | READY | Eligible rewards are dispatched through the provider adapter with sent/failed tracking. |
+| Airtime live reward verification | PARTIAL | Live provider delivery and recipient confirmation remain manual. |
+| Operational Insights | READY | FactoryLink internal organization-scoped analytics; this is **not** the Africa's Talking Insights API. |
+
+## 9. Future implementation
+
+Future work is limited to operational verification and marketplace submission tasks. It must not be interpreted as evidence that provider portal configuration, live handset tests, or production reward delivery have already occurred.
