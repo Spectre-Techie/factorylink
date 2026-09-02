@@ -68,6 +68,12 @@ function statusLabel(status: DashboardWorkOrder['status']): string {
   return status === 'in_progress' ? 'In progress' : status[0].toUpperCase() + status.slice(1);
 }
 
+function formatAttentionMessage(message: string, workOrders: DashboardWorkOrder[]): string {
+  return message.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi, (id) => {
+    return workOrders.find((workOrder) => workOrder.id === id)?.title ?? 'the referenced work order';
+  });
+}
+
 export default function HomePage() {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<DashboardUser | null>(null);
@@ -157,8 +163,10 @@ export default function HomePage() {
   const resolveAssigneeLabel = (assigneeId: string | null | undefined): string => {
     if (!assigneeId) return 'Unassigned';
     const technician = organizationTechnicians.find((person) => person.id === assigneeId);
+    if (user?.role === 'technician' && assigneeId === user.id) return 'You';
     return technician?.name ?? 'Unassigned';
   };
+  const displayName = /^phase\s+5\b/i.test(user?.name ?? '') ? roleLabel(user?.role ?? 'manager') : user?.name;
 
   useEffect(() => {
     document.title = user ? 'FactoryLink — Operations' : 'FactoryLink — Operations';
@@ -322,13 +330,13 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#f4f7f8] text-slate-950">
       <header className="border-b border-slate-800 bg-[#10252b] text-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">FactoryLink</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight">Industrial Operations Platform</h1>
+            <p className="mt-1 text-sm font-semibold text-slate-200">Industrial Operations Platform</p>
           </div>
-          <div className="flex flex-col gap-4 lg:items-end">
-            <div className="flex max-w-full gap-1 overflow-x-auto pb-1" aria-label="Primary navigation">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
+            <nav className="flex max-w-full flex-wrap gap-1 pb-1" aria-label="Primary navigation">
               {([['overview', 'Overview'], ['work-orders', 'Work Orders'], ['inventory', 'Inventory'], ['insights', 'Operational Insights'], ['rewards', 'Distributor Rewards']] as const)
                 .filter(([view]) => view === 'overview' || view === 'work-orders' || view === 'inventory' || user.role !== 'technician')
                 .map(([view, label]) => (
@@ -336,11 +344,11 @@ export default function HomePage() {
                     {label}
                   </button>
                 ))}
-            </div>
+            </nav>
             <div className="flex items-center justify-between gap-4 text-sm lg:justify-end">
               <div className="text-right">
-                <p className="font-semibold">{user.name}</p>
-                <p className="text-slate-300">{roleLabel(user.role)}</p>
+                <p className="font-semibold">{displayName}</p>
+                {displayName !== roleLabel(user.role) && <p className="text-slate-300">{roleLabel(user.role)}</p>}
               </div>
               <button className="rounded-md border border-slate-500 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10" type="button" onClick={handleLogout}>Log out</button>
             </div>
@@ -363,8 +371,8 @@ export default function HomePage() {
               ))}
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_1fr]">
-              <div className="surface-panel"><div className="flex items-center justify-between"><div><p className="section-kicker">Attention required</p><h3 className="mt-1 text-lg font-bold">Priority signals</h3></div><button type="button" onClick={() => setActiveView('insights')} className="text-sm font-bold text-cyan-800 hover:text-cyan-950">Open insights</button></div>
-                {insights?.attention?.length ? <ul className="mt-4 space-y-2">{insights.attention.slice(0, 4).map((item, index) => <li key={`${item.category}-${item.title}-${index}`} className="flex gap-3 border-t border-slate-200 py-3 text-sm"><span className={`status-badge ${item.priority === 'critical' ? 'status-critical' : item.priority === 'attention' ? 'status-attention' : 'status-healthy'}`}>{item.priority}</span><span><strong>{item.title}</strong><span className="block text-slate-600">{item.message}</span></span></li>)}</ul> : <p className="mt-4 rounded-md bg-emerald-50 px-3 py-3 text-sm text-emerald-800">No operational issues require attention.</p>}
+              <div className="surface-panel"><div className="flex items-center justify-between"><div><p className="section-kicker">Attention required</p><h3 className="mt-1 text-lg font-bold">Priority signals</h3></div>{user.role !== 'technician' && <button type="button" onClick={() => setActiveView('insights')} className="text-sm font-bold text-cyan-800 hover:text-cyan-950">Open insights</button>}</div>
+                {insights?.attention?.length ? <ul className="mt-4 space-y-2">{insights.attention.slice(0, 4).map((item, index) => <li key={`${item.category}-${item.title}-${index}`} className="flex gap-3 border-t border-slate-200 py-3 text-sm"><span className={`status-badge ${item.priority === 'critical' ? 'status-critical' : item.priority === 'attention' ? 'status-attention' : 'status-healthy'}`}>{item.priority}</span><span><strong>{item.title}</strong><span className="block text-slate-600">{formatAttentionMessage(item.message, workOrders)}</span></span></li>)}</ul> : <p className="mt-4 rounded-md bg-emerald-50 px-3 py-3 text-sm text-emerald-800">No operational issues require attention.</p>}
               </div>
               <div className="surface-panel"><p className="section-kicker">Inventory risk</p><h3 className="mt-1 text-lg font-bold">Stock position</h3>{insights ? <div className="mt-4 grid grid-cols-3 gap-3"><div><p className="text-xs text-slate-500">Low stock</p><p className="mt-1 text-2xl font-bold text-amber-700">{insights.inventoryRisk.lowStockItems}</p></div><div><p className="text-xs text-slate-500">Critical</p><p className="mt-1 text-2xl font-bold text-red-700">{insights.inventoryRisk.criticalAlerts}</p></div><div><p className="text-xs text-slate-500">Failed alerts</p><p className="mt-1 text-2xl font-bold text-slate-900">{insights.inventoryRisk.failedAlerts}</p></div></div> : <p className="mt-4 text-sm text-slate-500">Insights are still loading.</p>}<button type="button" onClick={() => setActiveView('inventory')} className="mt-5 text-sm font-bold text-cyan-800 hover:text-cyan-950">Review inventory</button></div>
             </div>
@@ -394,25 +402,6 @@ export default function HomePage() {
             </div>
           </form>
         )}
-        {activeView === 'overview' && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ['Total work orders', summary.total, 'text-slate-950'],
-            ['Pending', summary.pending, 'text-amber-700'],
-            ['In progress', summary.in_progress, 'text-blue-700'],
-            ['Completed', summary.completed, 'text-emerald-700'],
-          ].map(([label, value, color]) => (
-            <article key={label} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">{label}</p>
-              <p className={`mt-2 text-3xl font-bold ${color}`}>{value}</p>
-            </article>
-          ))}
-        </div>}
-
-        {activeView === 'overview' && <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-sm font-medium text-slate-500">Priority breakdown</p>
-          <div className="mt-2 flex gap-5 text-sm text-slate-700"><span>High <strong>{summary.byPriority.high}</strong></span><span>Medium <strong>{summary.byPriority.medium}</strong></span><span>Low <strong>{summary.byPriority.low}</strong></span></div>
-        </div>}
-
         {activeView === 'insights' && user.role !== 'technician' && (
           <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -448,7 +437,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Attention</h3>
-                  {insights.attention.length === 0 ? <p className="mt-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">No operational issues require attention.</p> : <ul className="mt-3 space-y-2">{insights.attention.map((item, index) => <li key={`${item.category}-${item.title}-${index}`} className="flex gap-3 rounded-lg bg-slate-50 px-3 py-3 text-sm"><span className="min-w-20 font-bold uppercase text-slate-600">{item.priority}</span><span><strong className="text-slate-900">{item.title}</strong><span className="block text-slate-600">{item.message}</span></span></li>)}</ul>}
+                  {insights.attention.length === 0 ? <p className="mt-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">No operational issues require attention.</p> : <ul className="mt-3 space-y-2">{insights.attention.map((item, index) => <li key={`${item.category}-${item.title}-${index}`} className="flex gap-3 rounded-lg bg-slate-50 px-3 py-3 text-sm"><span className="min-w-20 font-bold uppercase text-slate-600">{item.priority}</span><span><strong className="text-slate-900">{item.title}</strong><span className="block text-slate-600">{formatAttentionMessage(item.message, workOrders)}</span></span></li>)}</ul>}
                 </div>
               </div>
             )}
