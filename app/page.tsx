@@ -89,6 +89,7 @@ export default function HomePage() {
   const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [filters, setFilters] = useState<WorkOrderFilters>(defaultFilters);
   const [activeView, setActiveView] = useState<'overview' | 'work-orders' | 'inventory' | 'insights' | 'rewards'>('overview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -167,6 +168,20 @@ export default function HomePage() {
     return technician?.name ?? 'Unassigned';
   };
   const displayName = /^phase\s+5\b/i.test(user?.name ?? '') ? roleLabel(user?.role ?? 'manager') : user?.name;
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeoutId = window.setTimeout(() => setNotice(null), 2500);
+    return () => window.clearTimeout(timeoutId);
+  }, [notice]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
 
   useEffect(() => {
     document.title = user ? 'FactoryLink — Operations' : 'FactoryLink — Operations';
@@ -336,7 +351,12 @@ export default function HomePage() {
             <p className="mt-1 text-sm font-semibold text-slate-200">Industrial Operations Platform</p>
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
-            <nav className="flex max-w-full flex-wrap gap-1 pb-1" aria-label="Primary navigation">
+            <button type="button" className="mobile-menu-button" aria-expanded={mobileMenuOpen} aria-controls="mobile-navigation" onClick={() => setMobileMenuOpen((open) => !open)}>
+              <span className="sr-only">Toggle navigation</span>
+              <span aria-hidden="true" className="menu-lines"><span /><span /><span /></span>
+              <span>{mobileMenuOpen ? 'Close' : 'Menu'}</span>
+            </button>
+            <nav className="hidden max-w-full flex-wrap gap-1 pb-1 md:flex" aria-label="Primary navigation">
               {([['overview', 'Overview'], ['work-orders', 'Work Orders'], ['inventory', 'Inventory'], ['insights', 'Operational Insights'], ['rewards', 'Distributor Rewards']] as const)
                 .filter(([view]) => view === 'overview' || view === 'work-orders' || view === 'inventory' || user.role !== 'technician')
                 .map(([view, label]) => (
@@ -345,6 +365,15 @@ export default function HomePage() {
                   </button>
                 ))}
             </nav>
+            {mobileMenuOpen && <nav id="mobile-navigation" className="mobile-navigation md:hidden" aria-label="Mobile navigation">
+              {([['overview', 'Overview'], ['work-orders', 'Work Orders'], ['inventory', 'Inventory'], ['insights', 'Operational Insights'], ['rewards', 'Distributor Rewards']] as const)
+                .filter(([view]) => view === 'overview' || view === 'work-orders' || view === 'inventory' || user.role !== 'technician')
+                .map(([view, label]) => (
+                  <button key={view} type="button" onClick={() => { setActiveView(view); setMobileMenuOpen(false); }} aria-current={activeView === view ? 'page' : undefined} className={activeView === view ? 'mobile-nav-item mobile-nav-item-active' : 'mobile-nav-item'}>
+                    {label}
+                  </button>
+                ))}
+            </nav>}
             <div className="flex items-center justify-between gap-4 text-sm lg:justify-end">
               <div className="text-right">
                 <p className="font-semibold">{displayName}</p>
@@ -358,7 +387,7 @@ export default function HomePage() {
 
       <section className="mx-auto max-w-7xl px-5 py-8">
         {error && <p role="alert" aria-live="assertive" className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
-        {notice && <p role="status" aria-live="polite" className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}
+        {notice && <div role="status" aria-live="polite" className="toast toast-success">{notice}</div>}
         {activeView === 'overview' && (
           <section aria-labelledby="overview-heading" className="mb-8">
             <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
