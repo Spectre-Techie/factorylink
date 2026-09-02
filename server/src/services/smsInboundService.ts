@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 export interface SmsInboundPayload {
   phoneNumber?: string;
   phone_number?: string;
+  from?: string;
   text?: string;
   date?: string;
   id?: string;
@@ -13,6 +14,7 @@ export interface SmsInboundPayload {
   link_id?: string;
   to?: string;
   shortcode?: string;
+  cost?: string;
 }
 
 export interface KnownSender {
@@ -142,7 +144,7 @@ export class SmsInboundService {
   }
 
   async processIncomingMessage(payload: SmsInboundPayload): Promise<{ accepted: boolean; duplicate: boolean; reason?: string; record?: SmsInboundRecord | null }> {
-    const phoneNumber = (payload.phoneNumber ?? payload.phone_number ?? '').trim();
+    const phoneNumber = (payload.from ?? payload.phoneNumber ?? payload.phone_number ?? '').trim();
     const text = (payload.text ?? '').trim();
     const providerMessageId = (payload.id ?? payload.message_id ?? payload.messageId ?? null)?.trim() || null;
     const shortcode = (payload.to ?? payload.shortcode ?? '').trim() || null;
