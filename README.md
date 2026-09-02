@@ -65,6 +65,7 @@ factorylink/
 ├── public/
 ├── docker/
 │   ├── Dockerfile
+│   ├── Dockerfile.api
 │   └── docker-compose.yml
 ├── .github/
 │   └── workflows/
@@ -84,6 +85,8 @@ The project foundation includes the complete strategy and planning baseline in t
 - [docs/MARKETPLACE.md](docs/MARKETPLACE.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+
+Submission-readiness evidence, marketplace copy, the requirement audit, callback inventory, and the final demo flow are in [docs/MARKETPLACE.md](docs/MARKETPLACE.md). Verified Africa's Talking evidence and the exact server environment-variable contract are in [docs/AT-INTEGRATION.md](docs/AT-INTEGRATION.md).
 
 ## Current scope
 
@@ -169,7 +172,7 @@ Configure the Blueprint's repository, production branch, root directory, and aut
 
 ## Africa's Talking callbacks and Sandbox
 
-Configure these public callbacks in the Africa's Talking portal:
+These implemented application callbacks are the URLs to configure in the Africa's Talking portal. Portal configuration remains an external deployment action:
 
 - Incoming SMS: `https://factorylink-m9ai.onrender.com/api/africastalking/sms`
 - USSD: `https://factorylink-m9ai.onrender.com/api/africastalking/ussd`

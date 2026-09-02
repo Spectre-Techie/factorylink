@@ -19,41 +19,19 @@ This keeps the application easier to test and safer to evolve.
 
 ### SMS
 
-For status notifications, assignment updates, and simple instructions.
-
-Planned responsibilities:
-- message template lookup;
-- payload creation from work order or inventory events;
-- provider call execution;
-- response tracking and logging.
+FactoryLink supports outbound notifications and inbound Africa's Talking callbacks. The verified Sandbox shortcode is `3979`; a real AT Sandbox message reached FactoryLink and was persisted in Supabase using the official `from` field handling.
 
 ### USSD
 
-For low-bandwidth interaction and menu-based operations for technicians or field users.
-
-Planned responsibilities:
-- session creation and menu routing;
-- input parsing and validation;
-- state tracking for multi-step flows;
-- provider response mapping for the application.
+FactoryLink supports low-bandwidth order placement, stock checks, order history, sales reporting, Help, and invalid-input/session handling. These Sandbox flows are covered by the repository verification evidence.
 
 ### Voice
 
-For call-based workflows, confirmations, and callback-triggered coordination.
-
-Planned responsibilities:
-- call initiation and callback handling;
-- session state for interactive call flows;
-- call event normalization for application use.
+FactoryLink supports technician work-order call initiation, callback handling, and callback digit interaction. Live handset verification remains unavailable where AT account or platform limitations prevent a provisioned voice number or reachable callback.
 
 ### Airtime
 
-For planned operational or support-related credit distribution flows where allowed by business requirements.
-
-Planned responsibilities:
-- airtime request normalization;
-- provider-specific execution;
-- transaction record tracking and audit logs.
+FactoryLink fulfills eligible distributor rewards through the provider adapter. A real provider reward was successfully sent, with the provider reference recorded and status set to `sent`.
 
 ## 4. Provider abstraction layer
 
@@ -156,31 +134,63 @@ curl -X POST http://localhost:4000/dev/at/sandbox/sms-test \
 - No production or live Africa's Talking environment is used.
 - No database tables, frontend changes, or business-feature code are created here.
 
-## 8. Phase 11 integration matrix
+## 8. Phase 12 integration matrix
 
-This matrix separates repository behavior from provider-account and handset verification. `READY` means covered by implementation and repository tests; `PARTIAL` means the flow exists but external verification is still required; `MISSING` means evidence is not present.
+This matrix separates verified evidence from remaining external checks. `READY` means the capability is verified by known project evidence or repository tests; `PARTIAL` means implementation exists but an external check remains; `BLOCKED` means the check depends on an AT account/platform limitation.
 
 | Channel or capability | Status | Recorded behavior and remaining verification |
 |---|---|---|
-| SMS shortcode | MISSING | Shortcode `3979` is required for production configuration; no repository evidence confirms it is provisioned. |
-| SMS outbound | READY | Server-side provider adapter sends outbound notifications and the repository has service coverage. |
-| SMS inbound | READY | `POST /api/africastalking/sms` accepts AT callback fields, persists inbound messages, and deduplicates provider message IDs. |
-| SMS Sandbox verification | PARTIAL | The development-only `/dev/at/sandbox/sms-test` endpoint and manual procedure are documented; a live provider send is still manual. |
-| USSD ordering | READY | Session flow supports order placement with input validation. |
-| USSD stock | READY | Session menu supports Check Stock. |
-| USSD orders | READY | Session menu supports My Orders. |
-| USSD sales reporting | READY | Session menu supports Report Sales and the airtime reward flow. |
-| USSD help | READY | Session menu supports Help. |
-| USSD validation/session behavior | READY | Invalid input and multi-step session behavior are covered by service tests. |
+| SMS shortcode | READY | Sandbox shortcode `3979` is verified. |
+| SMS outbound | PARTIAL | Outbound notification code and provider abstraction are implemented; a live outbound delivery record is not included in the known evidence. |
+| SMS inbound | READY | `POST /api/africastalking/sms` accepts AT callback fields, handles the official `from` field, persists a real inbound message in Supabase, and deduplicates provider message IDs. |
+| SMS Sandbox verification | READY | Real AT Sandbox -> FactoryLink -> Supabase persistence was verified. |
+| USSD ordering | READY | Sandbox Place Order flow was verified with input validation. |
+| USSD stock | READY | Sandbox Check Stock flow was verified. |
+| USSD orders | READY | Sandbox My Orders flow was verified. |
+| USSD sales reporting | READY | Sandbox Report Sales flow was verified. |
+| USSD help | READY | Sandbox Help flow was verified. |
+| USSD validation/session behavior | READY | Sandbox invalid-input and session handling were verified. |
 | Voice callback | READY | `POST /api/africastalking/voice` accepts callback payload variants and returns XML. |
-| Voice technician call flow | READY | Authenticated work-order call initiation uses the provider adapter. |
+| Voice technician call flow | READY | Application call initiation uses the provider adapter and the flow is implemented. |
 | Voice callback digit handling | READY | Callback digit/DTMF values are normalized into the voice service flow. |
 | Voice live handset limitation | BLOCKED | Live handset verification remains unavailable until a provisioned AT voice number and reachable callback are supplied. |
 | Airtime reward tiers | READY | Sales-report eligibility and reward tiers are implemented and tested. |
-| Airtime provider request | READY | Eligible rewards are dispatched through the provider adapter with sent/failed tracking. |
-| Airtime live reward verification | PARTIAL | Live provider delivery and recipient confirmation remain manual. |
+| Airtime provider request | READY | A real provider reward was successfully sent and its provider reference was recorded. |
+| Airtime live reward verification | READY | Known evidence confirms provider success and status `sent`; recipient-side confirmation remains an operational follow-up. |
 | Operational Insights | READY | FactoryLink internal organization-scoped analytics; this is **not** the Africa's Talking Insights API. |
 
-## 9. Future implementation
+## 9. Callback inventory
+
+| Channel | Application callback | Implemented | Tested/evidenced | AT portal configuration |
+|---|---|---|---|---|
+| SMS | `https://factorylink-m9ai.onrender.com/api/africastalking/sms` | Yes | Yes, including real Sandbox persistence | Externally unverified; configure in AT portal. |
+| USSD | `https://factorylink-m9ai.onrender.com/api/africastalking/ussd` | Yes | Sandbox flows verified | Externally unverified; configure in AT portal. |
+| Voice | `https://factorylink-m9ai.onrender.com/api/africastalking/voice` | Yes | Callback/application flow verified; handset blocked | Externally unverified; configure in AT portal. |
+
+The URLs above are the documented application endpoints. “Implemented” and “tested/evidenced” describe FactoryLink; they do not claim that the Africa's Talking portal has been configured or that every callback has been exercised against a production account.
+
+## 10. Production environment variables
+
+The table below reflects the server configuration in `server/src/config.ts`. Required means the server rejects startup when the value is absent or empty. The frontend public variable is required for a useful deployed web service but is not validated by the server configuration module.
+
+| Variable | Required/optional | Purpose | Example format | Secret classification |
+|---|---|---|---|---|
+| `NODE_ENV` | Required | Runtime environment label. | `production` | Non-secret |
+| `PORT` | Optional | API listen port; defaults to `4000`. | `4000` | Non-secret |
+| `NEXT_PUBLIC_API_BASE_URL` | Optional in server code; required for deployed frontend configuration | Public API origin used by the web app and default voice callback construction. | `https://factorylink-m9ai.onrender.com` | Non-secret |
+| `SUPABASE_URL` | Optional in server config; required for persistence deployment | Supabase project URL. | `https://your-project.supabase.co` | Non-secret |
+| `SUPABASE_ANON_KEY` | Optional | Supabase anonymous client key. | `eyJ...` | Sensitive public configuration |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional in server assertion; required for persistence deployment | Supabase server-side service-role access. | `<supabase-service-role-key>` | Secret |
+| `SUPABASE_DB_URL` | Optional | Optional direct Supabase database connection URL. | `postgresql://...` | Secret |
+| `AT_ENVIRONMENT` | Required | Africa's Talking environment; must be `sandbox` or `production`. | `sandbox` | Non-secret configuration |
+| `AT_USERNAME` | Required | Africa's Talking account username. | `sandbox` or `<account-username>` | Sensitive credential |
+| `AT_API_KEY` | Required | Africa's Talking server-side API key. | `<africas-talking-api-key>` | Secret |
+| `AT_BASE_URL` | Optional | Africa's Talking API origin; defaults to `https://api.africastalking.com`. | `https://api.africastalking.com` | Non-secret |
+| `AT_SENDER_ID` | Optional | Sender ID; defaults to `FactoryLink`. | `FactoryLink` | Non-secret |
+| `AT_VOICE_NUMBER` | Optional | Provider voice caller number. | `+254700000000` | Sensitive configuration |
+| `VOICE_CALLBACK_URL` | Optional | Public callback URL for voice calls; defaults from the API base URL. | `https://factorylink-m9ai.onrender.com/api/africastalking/voice` | Non-secret |
+| `CORS_ORIGIN` | Optional | Allowed frontend origin(s). | `https://factorylink-web.onrender.com` | Non-secret |
+
+## 11. Future implementation
 
 Future work is limited to operational verification and marketplace submission tasks. It must not be interpreted as evidence that provider portal configuration, live handset tests, or production reward delivery have already occurred.
