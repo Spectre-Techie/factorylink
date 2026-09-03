@@ -38,7 +38,183 @@ FactoryLink is an offline-first manufacturing coordination platform for factorie
 
 **Pricing-plan wording:** Pricing is not defined in this repository. Marketplace pricing must be supplied manually; do not infer a free, paid, usage-based, or Africa's Talking charge from the implementation.
 
-## 2. Container requirements
+## 2. Hackathon submission copy
+
+### Short Description
+
+FactoryLink is offline-first manufacturing coordination for Africa. It helps factories, operations teams, technicians, and distributors coordinate work orders, inventory, sales, and rewards through web, SMS, USSD, and voice workflows.
+
+### Full Solution Description
+
+FactoryLink connects the people who keep manufacturing operations moving: factory managers, operations teams, maintenance technicians, and distributors. The web dashboard provides organization-scoped visibility into work orders, technician assignments, inventory risk, distributor sales, rewards, and FactoryLink's own operational analytics. SMS, USSD, and voice workflows extend coordination to environments where smartphones or continuous data access are not dependable. Africa's Talking supplies the SMS, USSD, voice, and airtime provider services; FactoryLink supplies the workflow, persistence, authorization, and internal analytics. A real AT Sandbox inbound SMS reached FactoryLink and was persisted in Supabase, and a real airtime reward was sent with its provider reference recorded and status set to `sent`.
+
+### Problem Statement
+
+Manufacturing work is often coordinated across phone calls, SMS threads, spreadsheets, manual stock records, and field visits. In constrained-connectivity environments, smartphone-only tools can leave technicians and distributors outside the operational system. FactoryLink brings work orders, inventory risk, field coordination, sales reporting, and distributor rewards into one workflow while retaining channels that work on basic phones and intermittent connectivity.
+
+### Key Features
+
+- organization-scoped work orders, assignment, and status tracking;
+- inventory visibility, low-stock alerts, and operational risk signals;
+- USSD Place Order, My Orders, Check Stock, Report Sales, Help, and invalid-input/session handling;
+- outbound SMS notifications and inbound SMS callbacks using shortcode `3979` evidence;
+- technician work-order voice calls, callback handling, and GetDigits interaction;
+- distributor reward tiers, Africa's Talking airtime requests, provider references, and sent/failed status;
+- FactoryLink internal operational analytics, not the Africa's Talking Insights API.
+
+### User Workflow
+
+1. A manager signs in and reviews the organization-scoped overview.
+2. Operations opens or updates a work order and assigns a technician.
+3. The technician is coordinated through supported SMS or voice application flows.
+4. Operations checks inventory, thresholds, and risk signals.
+5. A distributor uses USSD to place orders, check stock, view order history, or report sales.
+6. Eligible sales produce a reward request through the airtime provider, with the result and provider reference recorded.
+7. Management reviews FactoryLink's internal operational analytics.
+
+### Africa's Talking Products Used
+
+Select only: **SMS API, USSD API, Voice API, Airtime API**.
+
+Do not select Mobile Data, Insights/Application Data & Insight, Bulk SMS, or Premium SMS based on this repository. Operational Insights is FactoryLink's internal analytics layer.
+
+### Africa's Talking Integration Explanation
+
+FactoryLink keeps Africa's Talking calls behind a server-side provider adapter. SMS supports outbound notifications and inbound callbacks; the verified Sandbox shortcode is `3979`, and real AT Sandbox inbound data was persisted in Supabase using the official `from` field and organization-aware sender lookup. USSD supports order placement, stock checks, order history, sales reporting, Help, and invalid input/session handling. Voice supports technician work-order call flow, callbacks, and GetDigits callback interaction; live handset testing remains externally limited where the AT account or platform does not provide the required voice setup. Airtime fulfills eligible distributor rewards, with a successful provider result, provider reference, and `sent` status recorded.
+
+### Technologies Used
+
+Next.js, React, TypeScript, Node.js, Express, Supabase PostgreSQL, Africa's Talking APIs, Docker, Render, and GitHub.
+
+## 3. Submission-form checklist
+
+Status meanings: `READY` is supported by repository evidence; `PARTIAL` is drafted or implemented but needs an external/form step; `MISSING` has no supplied value or artifact; `MANUAL` must be supplied by the submitter.
+
+| Form field | Status | Submission evidence or required action |
+|---|---|---|
+| Team Name | MANUAL | Supply the team name. No team name is recorded in the repository. |
+| Team Leader Email | MANUAL | Supply the team leader email. |
+| Team Leader Phone Number | MANUAL | Supply the team leader phone number. |
+| Short Description | READY | Final copy is in Section 2. |
+| Full Solution Description | READY | Final copy is in Section 2. |
+| Problem Statement | READY | Final copy is in Section 2. |
+| Key Features | READY | Final list is in Section 2. |
+| User Workflow | READY | Final workflow is in Section 2. |
+| Africa's Talking Products Used | READY | Select SMS API, USSD API, Voice API, and Airtime API only. |
+| Africa's Talking Integration Explanation | READY | Evidence-based copy is in Section 2 and `docs/AT-INTEGRATION.md`. |
+| Technologies Used | READY | Final list is in Section 2. |
+| Git Repository | READY | `https://github.com/Spectre-Techie/factorylink` |
+| Live Application URL | READY | `https://factorylink-web.onrender.com` |
+| Demo Video | MANUAL | Record and submit a 3–5 minute demo video. |
+| Demo Credentials | MANUAL | Supply a non-production demo account and credentials through the form's secure mechanism. Do not commit them. |
+| Docker Image URL | MISSING | Publish the verified images to a container registry and supply public pull URLs. |
+| Environment Variables | READY | Exact matrix is in `docs/AT-INTEGRATION.md`; submit values through the form's secure mechanism only. |
+| Logo | MISSING | Supply an approved logo asset. |
+| Solution Documentation | READY | README, architecture, API, database, security, deployment, and AT documentation exist. |
+| Team Declaration | MANUAL | Complete the declaration in the submission form. |
+
+The prompt names 20 form fields but separately requests a 23-section documentation outline. The three additional section names are not provided. They are recorded as unidentified below rather than invented.
+
+## 4. Master solution document
+
+The following are the exact 23 required solution-document sections supplied for Phase 12B. Statuses identify content that is ready versus information that must be supplied manually.
+
+### 1. Solution Name
+
+**READY:** FactoryLink
+
+### 2. Team Name
+
+**WAITING FOR MY INPUT:** Supply the team name.
+
+### 3. Team Members
+
+**WAITING FOR MY INPUT:** Supply team member names and roles.
+
+### 4. Problem Statement
+
+**READY:** Manufacturing coordination is often split across calls, SMS threads, spreadsheets, manual stock records, and field visits. Smartphone-only tools can exclude technicians and distributors in constrained-connectivity environments.
+
+### 5. Solution Overview
+
+**READY:** FactoryLink is offline-first manufacturing coordination for Africa, connecting factories, operations teams, technicians, and distributors through a web dashboard plus SMS, USSD, voice, and airtime workflows.
+
+### 6. Target Users
+
+**READY:** Factory managers, operations teams, maintenance technicians, distributors, and deployment administrators.
+
+### 7. How the Solution Works
+
+**READY:** Managers coordinate work orders and inventory in the dashboard. Technicians receive field coordination through supported SMS or voice flows. Distributors use USSD for ordering, stock checks, order history, and sales reporting. Eligible sales can trigger an airtime reward whose provider result, reference, and status are recorded.
+
+### 8. Key Features
+
+**READY:** Organization-scoped work orders; technician coordination; inventory visibility and low-stock alerts; USSD ordering, stock, orders, sales reporting, Help, and validation; inbound/outbound SMS; voice callbacks and GetDigits interaction; distributor reward calculation and airtime fulfillment; FactoryLink internal analytics.
+
+### 9. User Workflow
+
+**READY:** Manager login -> operations overview -> work order assignment -> technician coordination -> inventory/risk review -> distributor USSD activity -> airtime reward -> internal analytics review.
+
+### 10. Africa's Talking APIs Used
+
+**READY:** Select only SMS API, USSD API, Voice API, and Airtime API. FactoryLink Operational Insights is not the Africa's Talking Insights API.
+
+### 11. How Each API Is Integrated
+
+**READY:** A server-side provider adapter handles SMS, USSD, voice, and airtime requests. Verified evidence includes shortcode `3979`, inbound SMS callback handling using the official `from` field, real AT Sandbox -> FactoryLink -> Supabase persistence, all listed USSD Sandbox flows, voice callback/GetDigits application testing, and successful airtime delivery with provider reference and `sent` status. Live voice handset testing remains externally limited.
+
+### 12. Technologies Used
+
+**READY:** Next.js, React, TypeScript, Node.js, Express, Supabase PostgreSQL, Africa's Talking APIs, Docker, Render, and GitHub.
+
+### 13. System Architecture
+
+**READY:** Next.js frontend and Express API run as separate services. Supabase PostgreSQL provides persistence. Africa's Talking calls remain behind the server-side provider adapter. Render and Docker provide deployment options.
+
+### 14. Database Used
+
+**READY:** Supabase PostgreSQL, initialized with the ordered SQL files in `server/sql/`.
+
+### 15. Deployment Information
+
+**READY:** Render services are defined in `render.yaml`; Docker production artifacts are `docker/Dockerfile` and `docker/Dockerfile.api`. Web runs `npm start` on port 3000; API runs `node dist/server/src/index.js` on port 4000. Environment values are injected externally.
+
+### 16. Live Application URL
+
+**READY:** `https://factorylink-web.onrender.com`
+
+Backend: `https://factorylink-m9ai.onrender.com`
+Health: `https://factorylink-m9ai.onrender.com/health`
+
+### 17. Git Repository
+
+**READY:** `https://github.com/Spectre-Techie/factorylink`
+
+### 18. Docker Image
+
+**PARTIAL:** Local Phase 11 images `factorylink-web:phase11` and `factorylink-api:phase11` are built and verified. **MANUAL EXTERNAL ACTION:** publish them to a public registry and supply the public image URL; no URL is invented here.
+
+### 19. Demo Credentials
+
+**WAITING FOR MY INPUT:** Supply a non-production demo account through the form's secure mechanism. Do not commit credentials.
+
+### 20. Future Improvements
+
+**READY:** Complete marketplace metadata, publish registry images, finalize legal/support information, and perform remaining provider-account and live handset checks. These are submission operations, not new product scope.
+
+### 21. Scalability Potential
+
+**READY:** The separate web/API services, organization-scoped service boundaries, provider adapter, and managed PostgreSQL deployment model support reuse across deployments. Scaling limits and production capacity have not been load-tested and should not be claimed.
+
+### 22. Business / Real-World Impact
+
+**READY:** FactoryLink gives manufacturing teams a shared operational view while preserving SMS, USSD, and voice access for field users in constrained-connectivity environments. Airtime rewards provide a recorded incentive path for eligible distributor sales.
+
+### 23. Demo Video Link
+
+**WAITING FOR MY INPUT:** Record the 3–5 minute demonstration and supply its URL.
+
+## 5. Container requirements
 
 Docker should be used for a reproducible environment and simplified deployment. Recommended requirements:
 
@@ -47,7 +223,7 @@ Docker should be used for a reproducible environment and simplified deployment. 
 - optional database container or Supabase-managed PostgreSQL service;
 - a local or hosted environment-specific configuration layer.
 
-## 3. Environment variables
+## 6. Environment variables
 
 A complete environment configuration should include:
 
@@ -61,7 +237,7 @@ A complete environment configuration should include:
 
 These values must be loaded from environment files or deployment secret management and never stored in source control.
 
-## 4. Deployment assumptions
+## 7. Deployment assumptions
 
 - A single deployment environment is sufficient for the MVP.
 - The application is designed around a simple, maintainable runtime.
@@ -69,7 +245,7 @@ These values must be loaded from environment files or deployment secret manageme
 - Secrets are managed outside version control.
 - The product should be deployable with minimal operational overhead.
 
-## 5. Reusable-instance requirements
+## 8. Reusable-instance requirements
 
 The application should support reusable deployment patterns where an instance can be redeployed or cloned with a fresh environment configuration. This requires:
 
@@ -78,7 +254,7 @@ The application should support reusable deployment patterns where an instance ca
 - no embedded secrets in build artifacts;
 - container-friendly defaults and documented runtime assumptions.
 
-## 6. Health checks
+## 9. Health checks
 
 The deployment setup should define basic health endpoints or container readiness checks to ensure the app is able to answer requests. Recommended checks include:
 
@@ -87,7 +263,7 @@ The deployment setup should define basic health endpoints or container readiness
 - provider connectivity readiness checks where appropriate;
 - graceful startup and shutdown handling.
 
-## 7. Marketplace readiness matrix
+## 10. Marketplace readiness matrix
 
 The following matrix records repository evidence only. `READY` means the item is documented or verifiable in this repository; it does not mean a third-party marketplace submission has been completed.
 
@@ -115,7 +291,7 @@ The following matrix records repository evidence only. `READY` means the item is
 | Support contact | MISSING | Provide a monitored support email or contact channel. |
 | Support documentation | READY | Setup, operational limitations, security, API, and integration support guidance are documented; add the final support contact when supplied. |
 
-## 8. Visual submission assets
+## 11. Visual submission assets
 
 Submit real screenshots from the deployed application, with sensitive data redacted:
 
@@ -128,7 +304,7 @@ Submit real screenshots from the deployed application, with sensitive data redac
 
 Do not create illustrative or fake screenshots. Record the URL, environment, and data-redaction status for each submitted image.
 
-## 9. Final demo narrative
+## 12. Final demo narrative
 
 Use this 3–5 minute judge-focused sequence with a prepared account and redacted demonstration data:
 
@@ -144,7 +320,7 @@ Use this 3–5 minute judge-focused sequence with a prepared account and redacte
 | 8. Airtime reward | Reward record with provider reference and sent status. | Eligible distributor activity can result in a recorded airtime reward. | Reward fulfillment and audit trail. |
 | 9. Operational Insights | Insights view. | These are FactoryLink's internal analytics, not the Africa's Talking Insights API. | Internal operational analytics. |
 
-## 10. Final submission checklist
+## 13. Final submission checklist
 
 ### READY NOW
 
@@ -172,6 +348,37 @@ Use this 3–5 minute judge-focused sequence with a prepared account and redacte
 
 - Live voice handset verification remains blocked if the AT account/platform does not provide a provisioned voice number or usable live callback path.
 
-## 11. Limitations
+## 14. Deployment and callback audit
+
+| Item | Status | Verified value |
+|---|---|---|
+| Frontend | READY | `https://factorylink-web.onrender.com` |
+| Backend | READY | `https://factorylink-m9ai.onrender.com` |
+| Health | READY | `https://factorylink-m9ai.onrender.com/health` |
+| GitHub | READY | `https://github.com/Spectre-Techie/factorylink` |
+| SMS callback | PARTIAL | `https://factorylink-m9ai.onrender.com/api/africastalking/sms`; implemented and real inbound evidence exists, AT portal configuration needs confirmation. |
+| USSD callback | PARTIAL | `https://factorylink-m9ai.onrender.com/api/africastalking/ussd`; implemented and Sandbox flows verified, AT portal configuration needs confirmation. |
+| Voice callback | PARTIAL | `https://factorylink-m9ai.onrender.com/api/africastalking/voice`; implemented and application callback flow verified, live handset remains externally limited. |
+
+### Docker audit
+
+| Item | Status | Evidence |
+|---|---|---|
+| Web image | READY | `factorylink-web:phase11`; Dockerfile `docker/Dockerfile`; production command `npm start`; exposed port `3000`. |
+| API image | READY | `factorylink-api:phase11`; Dockerfile `docker/Dockerfile.api`; production command `node dist/server/src/index.js`; exposed port `4000`. |
+| Build | READY | Both Phase 11 images built successfully. |
+| Run | READY | API image started with externalized environment variables. |
+| Health | READY | API container `/health` returned HTTP 200. |
+| Public Docker Image URL | MISSING | Push both images to a public registry, record registry namespace/tags, and submit the public pull URLs. |
+
+## 15. Legal and support status
+
+- Privacy Policy: **MISSING**. No policy document or URL exists in the repository; supply and publish one manually if required by the form or deployment.
+- Terms of Service: **MISSING**. No terms document or URL exists in the repository; supply and publish one manually if required.
+- Support contact: **MISSING**. No monitored support email or contact channel is recorded; supply one manually.
+
+The solution documentation should reference these as submission/deployment prerequisites without fabricating legal text or contact details.
+
+## 16. Limitations
 
 This foundation does not include a full production-grade marketplace or commercial deployment pipeline. It focuses on the minimal operational assumptions needed for a realistic pilot deployment.

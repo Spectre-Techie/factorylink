@@ -167,6 +167,11 @@ export default function HomePage() {
     if (user?.role === 'technician' && assigneeId === user.id) return 'You';
     return technician?.name ?? 'Unassigned';
   };
+  const navigateTo = (view: typeof activeView) => {
+    setActiveView(view);
+    setMobileMenuOpen(false);
+    setNotice(null);
+  };
   const displayName = /^phase\s+5\b/i.test(user?.name ?? '') ? roleLabel(user?.role ?? 'manager') : user?.name;
 
   useEffect(() => {
@@ -360,7 +365,7 @@ export default function HomePage() {
               {([['overview', 'Overview'], ['work-orders', 'Work Orders'], ['inventory', 'Inventory'], ['insights', 'Operational Insights'], ['rewards', 'Distributor Rewards']] as const)
                 .filter(([view]) => view === 'overview' || view === 'work-orders' || view === 'inventory' || user.role !== 'technician')
                 .map(([view, label]) => (
-                  <button key={view} type="button" onClick={() => setActiveView(view)} aria-current={activeView === view ? 'page' : undefined} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition ${activeView === view ? 'border-cyan-300 text-white' : 'border-transparent text-slate-300 hover:border-slate-500 hover:text-white'}`}>
+                  <button key={view} type="button" onClick={() => navigateTo(view)} aria-current={activeView === view ? 'page' : undefined} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition ${activeView === view ? 'border-cyan-300 text-white' : 'border-transparent text-slate-300 hover:border-slate-500 hover:text-white'}`}>
                     {label}
                   </button>
                 ))}
@@ -369,7 +374,7 @@ export default function HomePage() {
               {([['overview', 'Overview'], ['work-orders', 'Work Orders'], ['inventory', 'Inventory'], ['insights', 'Operational Insights'], ['rewards', 'Distributor Rewards']] as const)
                 .filter(([view]) => view === 'overview' || view === 'work-orders' || view === 'inventory' || user.role !== 'technician')
                 .map(([view, label]) => (
-                  <button key={view} type="button" onClick={() => { setActiveView(view); setMobileMenuOpen(false); }} aria-current={activeView === view ? 'page' : undefined} className={activeView === view ? 'mobile-nav-item mobile-nav-item-active' : 'mobile-nav-item'}>
+                  <button key={view} type="button" onClick={() => navigateTo(view)} aria-current={activeView === view ? 'page' : undefined} className={activeView === view ? 'mobile-nav-item mobile-nav-item-active' : 'mobile-nav-item'}>
                     {label}
                   </button>
                 ))}
@@ -400,11 +405,11 @@ export default function HomePage() {
               ))}
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <div className="surface-panel lg:col-span-2"><div className="flex items-center justify-between"><div><p className="section-kicker">Attention required</p><h3 className="mt-1 text-lg font-bold">Priority signals</h3></div>{user.role !== 'technician' && <button type="button" onClick={() => setActiveView('insights')} className="text-sm font-bold text-cyan-800 hover:text-cyan-950">Open insights</button>}</div>
+              <div className="surface-panel lg:col-span-2"><div className="flex items-center justify-between"><div><p className="section-kicker">Attention required</p><h3 className="mt-1 text-lg font-bold">Priority signals</h3></div>{user.role !== 'technician' && <button type="button" onClick={() => navigateTo('insights')} className="text-sm font-bold text-cyan-800 hover:text-cyan-950">Open insights</button>}</div>
                 {insights?.attention?.length ? <ul className="mt-4 space-y-2">{insights.attention.slice(0, 4).map((item, index) => <li key={`${item.category}-${item.title}-${index}`} className="flex gap-3 border-t border-slate-200 py-3 text-sm"><span className={`status-badge ${item.priority === 'critical' ? 'status-critical' : item.priority === 'attention' ? 'status-attention' : 'status-healthy'}`}>{item.priority}</span><span><strong>{item.title}</strong><span className="block text-slate-600">{formatAttentionMessage(item.message, workOrders)}</span></span></li>)}</ul> : <p className="mt-4 rounded-md bg-emerald-50 px-3 py-3 text-sm text-emerald-800">No operational issues require attention.</p>}
               </div>
-              <div className="surface-panel"><p className="section-kicker">Inventory risk</p><h3 className="mt-1 text-lg font-bold">Stock position</h3>{insights ? <div className="mt-4 grid grid-cols-3 gap-3"><div><p className="text-xs text-slate-500">Low stock</p><p className="mt-1 text-2xl font-bold text-amber-700">{insights.inventoryRisk.lowStockItems}</p></div><div><p className="text-xs text-slate-500">Critical</p><p className="mt-1 text-2xl font-bold text-red-700">{insights.inventoryRisk.criticalAlerts}</p></div><div><p className="text-xs text-slate-500">Failed alerts</p><p className="mt-1 text-2xl font-bold text-slate-900">{insights.inventoryRisk.failedAlerts}</p></div></div> : <p className="mt-4 text-sm text-slate-500">Insights are still loading.</p>}<button type="button" onClick={() => setActiveView('inventory')} className="mt-5 text-sm font-bold text-cyan-800 hover:text-cyan-950">Review inventory</button></div>
-              {user.role !== 'technician' && <div className="surface-panel lg:col-span-3"><div className="flex items-center justify-between"><div><p className="section-kicker">Distributor signals</p><h3 className="mt-1 text-lg font-bold">Sales and rewards</h3></div><button type="button" onClick={() => setActiveView('rewards')} className="text-sm font-bold text-cyan-800 hover:text-cyan-950">Review rewards</button></div>{insights ? <div className="mt-4 grid gap-4 sm:grid-cols-4"><div><p className="text-xs text-slate-500">Sales reports</p><p className="mt-1 text-xl font-bold">{insights.distributorPerformance.totalSalesReports}</p></div><div><p className="text-xs text-slate-500">Reported sales</p><p className="mt-1 text-xl font-bold">NGN {insights.distributorPerformance.totalReportedAmount}</p></div><div><p className="text-xs text-slate-500">Eligible rewards</p><p className="mt-1 text-xl font-bold">{insights.distributorPerformance.eligibleRewards}</p></div><div><p className="text-xs text-slate-500">Reward value</p><p className="mt-1 text-xl font-bold">NGN {insights.distributorPerformance.totalRewardValue}</p></div></div> : <p className="mt-4 text-sm text-slate-500">Distributor signals are still loading.</p>}</div>}
+              <div className="surface-panel"><p className="section-kicker">Inventory risk</p><h3 className="mt-1 text-lg font-bold">Stock position</h3>{insights ? <div className="mt-4 grid grid-cols-3 gap-3"><div><p className="text-xs text-slate-500">Low stock</p><p className="mt-1 text-2xl font-bold text-amber-700">{insights.inventoryRisk.lowStockItems}</p></div><div><p className="text-xs text-slate-500">Critical</p><p className="mt-1 text-2xl font-bold text-red-700">{insights.inventoryRisk.criticalAlerts}</p></div><div><p className="text-xs text-slate-500">Failed alerts</p><p className="mt-1 text-2xl font-bold text-slate-900">{insights.inventoryRisk.failedAlerts}</p></div></div> : <p className="mt-4 text-sm text-slate-500">Insights are still loading.</p>}<button type="button" onClick={() => navigateTo('inventory')} className="mt-5 text-sm font-bold text-cyan-800 hover:text-cyan-950">Review inventory</button></div>
+              {user.role !== 'technician' && <div className="surface-panel lg:col-span-3"><div className="flex items-center justify-between"><div><p className="section-kicker">Distributor signals</p><h3 className="mt-1 text-lg font-bold">Sales and rewards</h3></div><button type="button" onClick={() => navigateTo('rewards')} className="text-sm font-bold text-cyan-800 hover:text-cyan-950">Review rewards</button></div>{insights ? <div className="mt-4 grid gap-4 sm:grid-cols-4"><div><p className="text-xs text-slate-500">Sales reports</p><p className="mt-1 text-xl font-bold">{insights.distributorPerformance.totalSalesReports}</p></div><div><p className="text-xs text-slate-500">Reported sales</p><p className="mt-1 text-xl font-bold">NGN {insights.distributorPerformance.totalReportedAmount}</p></div><div><p className="text-xs text-slate-500">Eligible rewards</p><p className="mt-1 text-xl font-bold">{insights.distributorPerformance.eligibleRewards}</p></div><div><p className="text-xs text-slate-500">Reward value</p><p className="mt-1 text-xl font-bold">NGN {insights.distributorPerformance.totalRewardValue}</p></div></div> : <p className="mt-4 text-sm text-slate-500">Distributor signals are still loading.</p>}</div>}
             </div>
           </section>
         )}
