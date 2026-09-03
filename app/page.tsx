@@ -354,8 +354,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <Image src="/factorylink-logo.png" alt="FactoryLink logo" width={52} height={52} className="h-12 w-12 object-contain" priority />
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">FactoryLink</p>
+              <Image src="/factorylink-navbar-logo.png" alt="FactoryLink logo" width={88} height={88} className="h-20 w-20 object-contain" priority />
             </div>
             <p className="mt-1 text-sm font-semibold text-slate-200">Industrial Operations Platform</p>
           </div>
