@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 
 import {
   defaultFilters,
@@ -352,7 +353,10 @@ export default function HomePage() {
       <header className="border-b border-slate-800 bg-[#10252b] text-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">FactoryLink</p>
+            <div className="flex items-center gap-2">
+              <Image src="/factorylink-logo.png" alt="FactoryLink logo" width={52} height={52} className="h-12 w-12 object-contain" priority />
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">FactoryLink</p>
+            </div>
             <p className="mt-1 text-sm font-semibold text-slate-200">Industrial Operations Platform</p>
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
